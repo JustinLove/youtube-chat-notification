@@ -2,6 +2,7 @@ module YoutubeChatNotification exposing (..)
 
 import View exposing (NotificationStatus(..))
 import Harbor
+import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
 
 import Html
@@ -9,12 +10,14 @@ import Navigation exposing (Location)
 import Uuid exposing (Uuid)
 import Random.Pcg as Random
 import Http
+import Json.Decode
 
 type Msg
   = GotNotificationStatus NotificationStatus
   | CurrentUrl Location
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
+  | LiveBroadcasts (Result Http.Error (Json.Decode.Value))
   | UI (View.Msg)
 
 type alias Model =
@@ -68,10 +71,16 @@ update msg model =
       ({model | requestState = Just uuid}, Cmd.none)
     TokenInfo token (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
-      ({model | auth = Just token}, Cmd.none)
+      ({model | auth = Just token}, fetchLiveBroadcasts (Just token))
     TokenInfo _ (Err err) ->
       let _ = Debug.log "access token validation failed" err in
       ({model | auth = Nothing}, Cmd.none)
+    LiveBroadcasts (Ok value) ->
+      let _ = Debug.log "live broadcasts" value in
+      (model, Cmd.none)
+    LiveBroadcasts (Err err) ->
+      let _ = Debug.log "fetch broadcasts failed" err in
+      (model, Cmd.none)
     UI (View.None) ->
       (model, Cmd.none)
 
@@ -106,6 +115,46 @@ validateToken token =
     , timeout = Nothing
     , withCredentials = False
     }
+
+liveBroadcastsUrl : String
+liveBroadcastsUrl =
+  "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&broadcastStatus=active&broadcastType=all&key=" ++ YoutubeId.apikey
+
+fetchLiveBroadcasts : Maybe String -> Cmd Msg
+fetchLiveBroadcasts auth =
+  youtube
+    { clientId = YoutubeId.clientId
+    , auth = auth
+    , decoder = Json.Decode.value
+    , tagger = LiveBroadcasts
+    , url = liveBroadcastsUrl
+    }
+
+youtube :
+  { clientId : String
+  , auth : Maybe String
+  , decoder : Json.Decode.Decoder a
+  , tagger : ((Result Http.Error a) -> msg)
+  , url : String
+  } -> Cmd msg
+youtube {clientId, auth, decoder, tagger, url} =
+  Http.send tagger <| Http.request
+    { method = "GET"
+    , headers = authHeaders auth
+    , url = url
+    , body = Http.emptyBody
+    , expect = Http.expectJson decoder
+    , timeout = Nothing
+    , withCredentials = False
+    }
+
+authHeaders : Maybe String -> List Http.Header
+authHeaders auth =
+  case auth of
+    Just token ->
+      [ Http.header "Authorization" ("Bearer "++token) ]
+    Nothing ->
+      []
 
 extractHashArgument : String -> Location -> Maybe String
 extractHashArgument key location =

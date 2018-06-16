@@ -1,4 +1,5 @@
-module YoutubeId exposing (clientId)
+module YoutubeId exposing (clientId, apiKey)
 
 clientId = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+apikey = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
