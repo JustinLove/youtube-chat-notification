@@ -1,14 +1,16 @@
 module YoutubeChatNotification exposing (..)
 
-import View
+import View exposing (NotificationStatus(..))
+import Harbor
 
 import Html
 
 type Msg
-  = UI (View.Msg)
+  = GotNotificationStatus NotificationStatus
+  | UI (View.Msg)
 
 type alias Model =
-  {
+  { notificationStatus : NotificationStatus
   }
 
 main =
@@ -21,14 +23,30 @@ main =
 
 init : (Model, Cmd Msg)
 init =
-  ({}, Cmd.none)
+  ( { notificationStatus = Unknown
+    }
+  , Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
+    GotNotificationStatus status ->
+      ({model | notificationStatus = status}, Cmd.none)
     UI (View.None) ->
       (model, Cmd.none)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.none
+  Sub.batch
+    [ Harbor.notificationStatus receiveNotificationStatus
+    ]
+
+receiveNotificationStatus : String -> Msg
+receiveNotificationStatus status =
+  GotNotificationStatus
+    <| case status of
+      "unsupported" -> Unsupported
+      "denied" -> Denied
+      "granted" -> Granted
+      "default" -> Unknown
+      _ -> Unknown
