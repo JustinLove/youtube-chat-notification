@@ -31,10 +31,15 @@ main =
 
 init : Location -> (Model, Cmd Msg)
 init location =
+  let
+    auth = extractHashArgument "access_token" location
+    state = extractHashArgument "state" location
+      |> Maybe.andThen Uuid.fromString
+  in
   ( { notificationStatus = Unknown
     , location = location
-    , requestState = Nothing
-    , auth = Nothing
+    , requestState = state
+    , auth = auth
     }
   , Random.generate AuthState Uuid.uuidGenerator
   )
@@ -71,3 +76,18 @@ receiveNotificationStatus status =
       "granted" -> Granted
       "default" -> Unknown
       _ -> Unknown
+
+extractHashArgument : String -> Location -> Maybe String
+extractHashArgument key location =
+  location.hash
+    |> String.dropLeft 1
+    |> String.split "&"
+    |> List.map (String.split "=")
+    |> List.filter (\x -> case List.head x of
+      Just s ->
+        s == key
+      Nothing ->
+        False)
+    |> List.head
+    |> Maybe.andThen List.tail
+    |> Maybe.andThen List.head

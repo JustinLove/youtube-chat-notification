@@ -20,8 +20,8 @@ type NotificationStatus
 
 view model =
   div []
-    [ displayLogin model
-    , text <| toString model.notificationStatus
+    [ header [] [displayLogin model]
+    , div [] [text <| toString model.notificationStatus]
     ]
 
 displayLogin model =
