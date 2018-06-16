@@ -2,16 +2,19 @@ module YoutubeChatNotification exposing (..)
 
 import View exposing (NotificationStatus(..))
 import Harbor
+import GoogleApis.Oauth2V1.Decode as GoogleApis
 
 import Html
 import Navigation exposing (Location)
 import Uuid exposing (Uuid)
 import Random.Pcg as Random
+import Http
 
 type Msg
   = GotNotificationStatus NotificationStatus
   | CurrentUrl Location
   | AuthState Uuid
+  | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | UI (View.Msg)
 
 type alias Model =
@@ -39,9 +42,14 @@ init location =
   ( { notificationStatus = Unknown
     , location = location
     , requestState = state
-    , auth = auth
+    , auth = Nothing
     }
-  , Random.generate AuthState Uuid.uuidGenerator
+  , Cmd.batch
+    [ Random.generate AuthState Uuid.uuidGenerator
+    , case auth of
+      Just token -> validateToken token
+      Nothing -> Cmd.none
+    ]
   )
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -58,6 +66,12 @@ update msg model =
       ({model | location = location}, Cmd.none)
     AuthState uuid ->
       ({model | requestState = Just uuid}, Cmd.none)
+    TokenInfo token (Ok info) ->
+      let _ = Debug.log "token expires in " info.expires_in in
+      ({model | auth = Just token}, Cmd.none)
+    TokenInfo _ (Err err) ->
+      let _ = Debug.log "access token validation failed" err in
+      ({model | auth = Nothing}, Cmd.none)
     UI (View.None) ->
       (model, Cmd.none)
 
@@ -76,6 +90,22 @@ receiveNotificationStatus status =
       "granted" -> Granted
       "default" -> Unknown
       _ -> Unknown
+
+validateTokenUrl : String -> String
+validateTokenUrl token =
+  "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" ++ token
+
+validateToken : String -> Cmd Msg
+validateToken token =
+  Http.send (TokenInfo token) <| Http.request
+    { method = "GET"
+    , headers = []
+    , url = validateTokenUrl token
+    , body = Http.emptyBody
+    , expect = Http.expectJson GoogleApis.tokenInfo
+    , timeout = Nothing
+    , withCredentials = False
+    }
 
 extractHashArgument : String -> Location -> Maybe String
 extractHashArgument key location =
