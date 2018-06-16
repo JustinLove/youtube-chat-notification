@@ -27,6 +27,17 @@
       })
     }
   })
+
+  app.ports.notificationSend.subscribe(function(message) {
+    if (Notification && Notification.permission == "granted") {
+      var notice = new Notification(message)
+      if (notice) {
+        notice.onclick = function() {
+          notice.close()
+        }
+      }
+    }
+  })
 </script>
 
 </html>

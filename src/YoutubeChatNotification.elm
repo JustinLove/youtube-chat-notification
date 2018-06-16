@@ -36,7 +36,7 @@ update msg model =
       , if status == Unknown then
           Harbor.notificationRequestPermission ()
         else
-          Cmd.none
+          Harbor.notificationSend "hi"
       )
     UI (View.None) ->
       (model, Cmd.none)
