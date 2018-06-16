@@ -19,6 +19,14 @@
   } else {
     app.ports.notificationStatus.send("unsupported")
   }
+
+  app.ports.notificationRequestPermission.subscribe(function() {
+    if (Notification && Notification.permission != "granted") {
+      Notification.requestPermission(function(permission) {
+        app.ports.notificationStatus.send(Notification.permission)
+      })
+    }
+  })
 </script>
 
 </html>

@@ -2,7 +2,7 @@ module View exposing (Msg(..), NotificationStatus(..), view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, on, onCheck)
+import Html.Events exposing (onClick)
 
 type Msg
   = None

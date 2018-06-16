@@ -25,13 +25,19 @@ init : (Model, Cmd Msg)
 init =
   ( { notificationStatus = Unknown
     }
-  , Cmd.none)
+  , Cmd.none
+  )
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     GotNotificationStatus status ->
-      ({model | notificationStatus = status}, Cmd.none)
+      ({model | notificationStatus = status}
+      , if status == Unknown then
+          Harbor.notificationRequestPermission ()
+        else
+          Cmd.none
+      )
     UI (View.None) ->
       (model, Cmd.none)
 
