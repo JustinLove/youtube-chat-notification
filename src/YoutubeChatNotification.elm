@@ -4,28 +4,39 @@ import View exposing (NotificationStatus(..))
 import Harbor
 
 import Html
+import Navigation exposing (Location)
+import Uuid exposing (Uuid)
+import Random.Pcg as Random
 
 type Msg
   = GotNotificationStatus NotificationStatus
+  | CurrentUrl Location
+  | AuthState Uuid
   | UI (View.Msg)
 
 type alias Model =
   { notificationStatus : NotificationStatus
+  , location : Location
+  , requestState : Maybe Uuid
+  , auth : Maybe String
   }
 
 main =
-  Html.program
+  Navigation.program CurrentUrl
     { init = init
     , view = (\model -> Html.map UI (View.view model))
     , update = update
     , subscriptions = subscriptions
     }
 
-init : (Model, Cmd Msg)
-init =
+init : Location -> (Model, Cmd Msg)
+init location =
   ( { notificationStatus = Unknown
+    , location = location
+    , requestState = Nothing
+    , auth = Nothing
     }
-  , Cmd.none
+  , Random.generate AuthState Uuid.uuidGenerator
   )
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -36,8 +47,12 @@ update msg model =
       , if status == Unknown then
           Harbor.notificationRequestPermission ()
         else
-          Harbor.notificationSend "hi"
+          Cmd.none --Harbor.notificationSend "hi"
       )
+    CurrentUrl location ->
+      ({model | location = location}, Cmd.none)
+    AuthState uuid ->
+      ({model | requestState = Just uuid}, Cmd.none)
     UI (View.None) ->
       (model, Cmd.none)
 

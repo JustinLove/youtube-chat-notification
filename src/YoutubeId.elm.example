@@ -1,0 +1,4 @@
+module YoutubeId exposing (clientId)
+
+clientId = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
