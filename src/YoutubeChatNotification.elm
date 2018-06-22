@@ -19,7 +19,7 @@ type Msg
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
-  | GotLiveChatMessages (Result Http.Error (Json.Decode.Value))
+  | GotLiveChatMessages (Result Http.Error (Youtube.LiveChatMessageListResponse))
   | UI (View.Msg)
 
 type alias Model =
@@ -87,8 +87,8 @@ update msg model =
     GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)
-    GotLiveChatMessages (Ok value) ->
-      let _ = Debug.log "live chat" value in
+    GotLiveChatMessages (Ok response) ->
+      let _ = Debug.log "live chat" response in
       (model, Cmd.none)
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
@@ -139,7 +139,7 @@ fetchLiveChatMessages : Maybe String -> String -> Cmd Msg
 fetchLiveChatMessages auth liveChatId =
   youtube
     { auth = auth
-    , decoder = Json.Decode.value
+    , decoder = Youtube.liveChatMessageListResponse
     , tagger = GotLiveChatMessages
     , url = liveChatMessagesUrl liveChatId
     }

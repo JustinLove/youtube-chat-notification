@@ -3,6 +3,10 @@ module Youtube.DataV3.Decode exposing
   , LiveBroadcast
   , liveBroadcastListResponse
   , sampleLiveBroadcastListResponse
+  , LiveChatMessageListResponse
+  , LiveChatMessage
+  , liveChatMessageListResponse
+  , sampleLiveChatMessageListResponse
   )
 
 import Json.Decode exposing (..)
@@ -30,7 +34,7 @@ liveBroadcastListResponse =
 type alias LiveBroadcast =
   { etag : String
   , id : String
-  , snippet : Snippet
+  , snippet : LiveBroadcastSnippet
   --, status : Maybe Status
   --, contentDetails : Maybe ContentDetails
   --, statistics : Maybe Statistics
@@ -41,12 +45,12 @@ liveBroadcast =
   map3 LiveBroadcast
     (field "etag" string)
     (field "id" string)
-    (field "snippet" snippet)
+    (field "snippet" liveBroadcastSnippet)
     --(field "status" maybe status)
     --(field "contentDetails" maybe contentDetails)
     --(field "statistics" maybe statistics)
 
-type alias Snippet =
+type alias LiveBroadcastSnippet =
   { publishedAt : Time
   , channelId : String
   , title : String
@@ -60,9 +64,9 @@ type alias Snippet =
   , liveChatId : String
   }
 
-snippet : Decoder Snippet
-snippet =
-  succeed Snippet
+liveBroadcastSnippet : Decoder LiveBroadcastSnippet
+liveBroadcastSnippet =
+  succeed LiveBroadcastSnippet
     |> map2 (|>) (field "publishedAt" timeStamp)
     |> map2 (|>) (field "channelId" string)
     |> map2 (|>) (field "title" string)
@@ -137,6 +141,127 @@ sampleLiveBroadcastListResponse = """
     "actualStartTime": "2018-06-16T14:00:51.000Z",
     "isDefaultBroadcast": true,
     "liveChatId": "EiEKGFVDUUlkRl9ZUUtNYi0xOUhvOG81V2J4ZxIFL2xpdmU"
+   }
+  }
+ ]
+}
+"""
+
+type alias LiveChatMessageListResponse =
+  { etag : String
+  , nextPageToken : Maybe String
+  , pollingIntervalMillis : Int
+  , offlineAt : Maybe Time
+  , pageInfo : PageInfo
+  , items : List LiveChatMessage
+  }
+
+liveChatMessageListResponse : Decoder LiveChatMessageListResponse
+liveChatMessageListResponse =
+  map6 LiveChatMessageListResponse
+    (field "etag" string)
+    (maybe (field "nextPageToken" string))
+    (field "pollingIntervalMillis" int)
+    (maybe (field "offlineAt" timeStamp))
+    (field "pageInfo" pageInfo)
+    (field "items" (list liveChatMessage))
+
+type alias LiveChatMessage =
+  { etag : String
+  , id : String
+  , snippet : LiveChatMessageSnippet
+  , authorDetails : AuthorDetails
+  }
+
+liveChatMessage : Decoder LiveChatMessage
+liveChatMessage =
+  map4 LiveChatMessage
+    (field "etag" string)
+    (field "id" string)
+    (field "snippet" liveChatMessageSnippet)
+    (field "authorDetails" authorDetails)
+
+type alias LiveChatMessageSnippet =
+  { liveChatId : String
+  , authorChannelId : String
+  , publishedAt : Time
+  , hasDisplayContent : Bool
+  , displayMessage : String
+  --, fanFundingEventDetails : FanFundingEventDetails
+  , textMessageDetails : String
+  --, messageDeletedDetails : String
+  --, userBannedDetails : UserBannedDetails
+  --, superChatDetails : SuperChatDetails
+  }
+
+liveChatMessageSnippet : Decoder LiveChatMessageSnippet
+liveChatMessageSnippet =
+  succeed LiveChatMessageSnippet
+    |> map2 (|>) (field "liveChatId" string)
+    |> map2 (|>) (field "authorChannelId" string)
+    |> map2 (|>) (field "publishedAt" timeStamp)
+    |> map2 (|>) (field "hasDisplayContent" bool)
+    |> map2 (|>) (field "displayMessage" string)
+    |> map2 (|>) (at ["textMessageDetails", "messageText"] string)
+
+type alias AuthorDetails =
+  { channelId : String
+  , channelUrl : String
+  , displayName : String
+  , profileImageUrl : String
+  , isVerified : Bool
+  , isChatOwner : Bool
+  , isChatSponsor : Bool
+  , isChatModerator : Bool
+  }
+
+authorDetails : Decoder AuthorDetails
+authorDetails =
+  succeed AuthorDetails
+    |> map2 (|>) (field "channelId" string)
+    |> map2 (|>) (field "channelUrl" string)
+    |> map2 (|>) (field "displayName" string)
+    |> map2 (|>) (field "profileImageUrl" string)
+    |> map2 (|>) (field "isVerified" bool)
+    |> map2 (|>) (field "isChatOwner" bool)
+    |> map2 (|>) (field "isChatSponsor" bool)
+    |> map2 (|>) (field "isChatModerator" bool)
+
+sampleLiveChatMessageListResponse = """
+{
+ "kind": "youtube#liveChatMessageListResponse",
+ "etag": "\\"DuHzAJ-eQIiCIp7p4ldoVcVAOeY/kMSBWSl6lnocPzvkZ_wvg_UuDLU\\"",
+ "nextPageToken": "GMaApprK59sCIJys1p7K59sC",
+ "pollingIntervalMillis": 3000,
+ "pageInfo": {
+  "totalResults": 1,
+  "resultsPerPage": 1
+ },
+ "items": [
+  {
+   "kind": "youtube#liveChatMessage",
+   "etag": "\\"DuHzAJ-eQIiCIp7p4ldoVcVAOeY/PIDcEwPK1J_oA470Qxo2540iNZA\\"",
+   "id": "LCC.CiMSIQoYVUNRSWRGX1lRS01iLTE5SG84bzVXYnhnEgUvbGl2ZRI5ChpDTWFBcHBySzU5c0NGUXh6Z3dvZGgzTURQZxIbQ1BlQXZaS3c1OXNDRmN3cEF3b2Q4NkVPNWcw",
+   "snippet": {
+    "type": "textMessageEvent",
+    "liveChatId": "EiEKGFVDUUlkRl9ZUUtNYi0xOUhvOG81V2J4ZxIFL2xpdmU",
+    "authorChannelId": "UCQIdF_YQKMb-19Ho8o5Wbxg",
+    "publishedAt": "2018-06-22T15:25:11.777Z",
+    "hasDisplayContent": true,
+    "displayMessage": "hi",
+    "textMessageDetails": {
+     "messageText": "hi"
+    }
+   },
+   "authorDetails": {
+    "channelId": "UCQIdF_YQKMb-19Ho8o5Wbxg",
+    "channelUrl": "http://www.youtube.com/channel/UCQIdF_YQKMb-19Ho8o5Wbxg",
+    "displayName": "wondible",
+    "profileImageUrl": "https://yt3.ggpht.com/-0Olxa2vkpR8/AAAAAAAAAAI/AAAAAAAAAAA/yYNHNpM1Htg/s88-c-k-no-mo-rj-c0xffffff/photo.jpg",
+    "isVerified": false,
+    "isChatOwner": true,
+    "isChatSponsor": false,
+    "isChatModerator": false
    }
   }
  ]
