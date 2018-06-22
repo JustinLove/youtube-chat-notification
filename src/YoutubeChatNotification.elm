@@ -4,6 +4,7 @@ import View exposing (NotificationStatus(..))
 import Harbor
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
+import Youtube.DataV3.Decode as Youtube
 
 import Html
 import Navigation exposing (Location)
@@ -17,7 +18,7 @@ type Msg
   | CurrentUrl Location
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
-  | LiveBroadcasts (Result Http.Error (Json.Decode.Value))
+  | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
   | UI (View.Msg)
 
 type alias Model =
@@ -25,6 +26,7 @@ type alias Model =
   , location : Location
   , requestState : Maybe Uuid
   , auth : Maybe String
+  , liveBroadcast : Maybe Youtube.LiveBroadcast
   }
 
 main =
@@ -46,6 +48,7 @@ init location =
     , location = location
     , requestState = state
     , auth = Nothing
+    , liveBroadcast = Nothing
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
@@ -75,10 +78,10 @@ update msg model =
     TokenInfo _ (Err err) ->
       let _ = Debug.log "access token validation failed" err in
       ({model | auth = Nothing}, Cmd.none)
-    LiveBroadcasts (Ok value) ->
-      let _ = Debug.log "live broadcasts" value in
-      (model, Cmd.none)
-    LiveBroadcasts (Err err) ->
+    GotLiveBroadcasts (Ok response) ->
+      ( {model | liveBroadcast = List.head response.items}
+      , Cmd.none)
+    GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)
     UI (View.None) ->
@@ -125,8 +128,8 @@ fetchLiveBroadcasts auth =
   youtube
     { clientId = YoutubeId.clientId
     , auth = auth
-    , decoder = Json.Decode.value
-    , tagger = LiveBroadcasts
+    , decoder = Youtube.liveBroadcastListResponse
+    , tagger = GotLiveBroadcasts
     , url = liveBroadcastsUrl
     }
 
