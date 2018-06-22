@@ -1,6 +1,6 @@
 module YoutubeChatNotification exposing (..)
 
-import View exposing (Broadcast)
+import View exposing (Broadcast, Message)
 import Notification exposing (NotificationStatus(..))
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
@@ -28,6 +28,7 @@ type alias Model =
   , requestState : Maybe Uuid
   , auth : Maybe String
   , broadcast : Maybe Broadcast
+  , messages : List Message
   }
 
 main =
@@ -50,6 +51,7 @@ init location =
     , requestState = state
     , auth = Nothing
     , broadcast = Nothing
+    , messages = []
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
@@ -88,8 +90,9 @@ update msg model =
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)
     GotLiveChatMessages (Ok response) ->
-      let _ = Debug.log "live chat" response in
-      (model, Cmd.none)
+      ( {model | messages = response.items |> List.map myMessage}
+      , Cmd.none
+      )
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
       (model, Cmd.none)
@@ -102,6 +105,13 @@ myBroadcast {snippet} =
   , description = snippet.description
   , actualStartTime = snippet.actualStartTime
   , liveChatId = snippet.liveChatId
+  }
+
+myMessage : Youtube.LiveChatMessage -> Message
+myMessage {snippet, authorDetails} =
+  { authorDisplayName = authorDetails.displayName
+  , publishedAt = snippet.publishedAt
+  , displayMessage = snippet.displayMessage |> Maybe.withDefault ""
   }
 
 subscriptions : Model -> Sub Msg

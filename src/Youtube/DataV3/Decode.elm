@@ -182,13 +182,13 @@ liveChatMessage =
     (field "authorDetails" authorDetails)
 
 type alias LiveChatMessageSnippet =
-  { liveChatId : String
-  , authorChannelId : String
+  { messageType : String
+  , liveChatId : String
+  , authorChannelId : Maybe String
   , publishedAt : Time
   , hasDisplayContent : Bool
-  , displayMessage : String
-  --, fanFundingEventDetails : FanFundingEventDetails
-  , textMessageDetails : String
+  , displayMessage : Maybe String
+  , textMessageDetails : Maybe String
   --, messageDeletedDetails : String
   --, userBannedDetails : UserBannedDetails
   --, superChatDetails : SuperChatDetails
@@ -197,12 +197,13 @@ type alias LiveChatMessageSnippet =
 liveChatMessageSnippet : Decoder LiveChatMessageSnippet
 liveChatMessageSnippet =
   succeed LiveChatMessageSnippet
+    |> map2 (|>) (field "type" string)
     |> map2 (|>) (field "liveChatId" string)
-    |> map2 (|>) (field "authorChannelId" string)
+    |> map2 (|>) (maybe (field "authorChannelId" string))
     |> map2 (|>) (field "publishedAt" timeStamp)
     |> map2 (|>) (field "hasDisplayContent" bool)
-    |> map2 (|>) (field "displayMessage" string)
-    |> map2 (|>) (at ["textMessageDetails", "messageText"] string)
+    |> map2 (|>) (maybe (field "displayMessage" string))
+    |> map2 (|>) (maybe (at ["textMessageDetails", "messageText"] string))
 
 type alias AuthorDetails =
   { channelId : String

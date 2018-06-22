@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Broadcast, view)
+module View exposing (Msg(..), Broadcast, Message, view)
 
 import YoutubeId
 import Notification exposing (NotificationStatus(..))
@@ -21,14 +21,23 @@ type alias Broadcast =
   , liveChatId : String
   }
 
+type alias Message =
+  { authorDisplayName : String
+  , publishedAt : Time
+  , displayMessage : String
+  }
+
 view model =
   div []
-    [ header [] [displayLogin model]
+    [ header [] [loginView model]
     , div [] [text <| toString model.notificationStatus]
     , div [] [text <| (model.broadcast |> Maybe.map .title |> Maybe.withDefault "--")]
+    , model.messages
+      |> List.map messageView
+      |> ul []
     ]
 
-displayLogin model =
+loginView model =
   case model.auth of
     Just _ ->
       span []
@@ -55,3 +64,11 @@ urlForRedirect location =
   location.href
     |> String.dropRight (String.length location.hash)
     |> String.dropRight (String.length location.search)
+
+messageView : Message -> Html msg
+messageView message =
+  li []
+    [ text message.authorDisplayName
+    , text ": "
+    , text message.displayMessage
+    ]
