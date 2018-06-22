@@ -126,21 +126,19 @@ liveBroadcastsUrl =
 fetchLiveBroadcasts : Maybe String -> Cmd Msg
 fetchLiveBroadcasts auth =
   youtube
-    { clientId = YoutubeId.clientId
-    , auth = auth
+    { auth = auth
     , decoder = Youtube.liveBroadcastListResponse
     , tagger = GotLiveBroadcasts
     , url = liveBroadcastsUrl
     }
 
 youtube :
-  { clientId : String
-  , auth : Maybe String
+  { auth : Maybe String
   , decoder : Json.Decode.Decoder a
   , tagger : ((Result Http.Error a) -> msg)
   , url : String
   } -> Cmd msg
-youtube {clientId, auth, decoder, tagger, url} =
+youtube {auth, decoder, tagger, url} =
   Http.send tagger <| Http.request
     { method = "GET"
     , headers = authHeaders auth
