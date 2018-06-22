@@ -1,6 +1,7 @@
-module View exposing (Msg(..), NotificationStatus(..), view)
+module View exposing (Msg(..), view)
 
 import YoutubeId
+import Notification exposing (NotificationStatus(..))
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -11,12 +12,6 @@ import Http
 
 type Msg
   = None
-
-type NotificationStatus
-  = Unsupported
-  | Denied
-  | Granted
-  | Unknown
 
 view model =
   div []

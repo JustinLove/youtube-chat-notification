@@ -1,7 +1,7 @@
 module YoutubeChatNotification exposing (..)
 
-import View exposing (NotificationStatus(..))
-import Harbor
+import View
+import Notification exposing (NotificationStatus(..))
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
 import Youtube.DataV3.Decode as Youtube
@@ -64,9 +64,9 @@ update msg model =
     GotNotificationStatus status ->
       ({model | notificationStatus = status}
       , if status == Unknown then
-          Harbor.notificationRequestPermission ()
+          Notification.requestPermission ()
         else
-          Cmd.none --Harbor.notificationSend "hi"
+          Cmd.none --Notification.send "hi"
       )
     CurrentUrl location ->
       ({model | location = location}, Cmd.none)
@@ -90,18 +90,8 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch
-    [ Harbor.notificationStatus receiveNotificationStatus
+    [ Notification.status GotNotificationStatus
     ]
-
-receiveNotificationStatus : String -> Msg
-receiveNotificationStatus status =
-  GotNotificationStatus
-    <| case status of
-      "unsupported" -> Unsupported
-      "denied" -> Denied
-      "granted" -> Granted
-      "default" -> Unknown
-      _ -> Unknown
 
 validateTokenUrl : String -> String
 validateTokenUrl token =
