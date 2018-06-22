@@ -19,6 +19,7 @@ type Msg
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
+  | GotLiveChatMessages (Result Http.Error (Json.Decode.Value))
   | UI (View.Msg)
 
 type alias Model =
@@ -79,10 +80,18 @@ update msg model =
       let _ = Debug.log "access token validation failed" err in
       ({model | auth = Nothing}, Cmd.none)
     GotLiveBroadcasts (Ok response) ->
-      ( {model | liveBroadcast = List.head response.items}
-      , Cmd.none)
+      let mbroadcast = List.head response.items in
+      ( {model | liveBroadcast = mbroadcast }
+      , mbroadcast |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.snippet.liveChatId) |> Maybe.withDefault Cmd.none
+      )
     GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
+      (model, Cmd.none)
+    GotLiveChatMessages (Ok value) ->
+      let _ = Debug.log "live chat" value in
+      (model, Cmd.none)
+    GotLiveChatMessages (Err err) ->
+      let _ = Debug.log "fetch chat failed" err in
       (model, Cmd.none)
     UI (View.None) ->
       (model, Cmd.none)
@@ -120,6 +129,19 @@ fetchLiveBroadcasts auth =
     , decoder = Youtube.liveBroadcastListResponse
     , tagger = GotLiveBroadcasts
     , url = liveBroadcastsUrl
+    }
+
+liveChatMessagesUrl : String -> String
+liveChatMessagesUrl liveChatId =
+  "https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=" ++ liveChatId ++ "&key=" ++ YoutubeId.apikey
+
+fetchLiveChatMessages : Maybe String -> String -> Cmd Msg
+fetchLiveChatMessages auth liveChatId =
+  youtube
+    { auth = auth
+    , decoder = Json.Decode.value
+    , tagger = GotLiveChatMessages
+    , url = liveChatMessagesUrl liveChatId
     }
 
 youtube :
