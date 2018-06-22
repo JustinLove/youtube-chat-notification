@@ -1,4 +1,4 @@
-module View exposing (Msg(..), view)
+module View exposing (Msg(..), Broadcast, view)
 
 import YoutubeId
 import Notification exposing (NotificationStatus(..))
@@ -9,14 +9,23 @@ import Html.Events exposing (onClick)
 import Navigation exposing (Location)
 import Uuid exposing (Uuid)
 import Http
+import Time exposing (Time)
 
 type Msg
   = None
+
+type alias Broadcast =
+  { title : String
+  , description : String
+  , actualStartTime : Maybe Time
+  , liveChatId : String
+  }
 
 view model =
   div []
     [ header [] [displayLogin model]
     , div [] [text <| toString model.notificationStatus]
+    , div [] [text <| (model.broadcast |> Maybe.map .title |> Maybe.withDefault "--")]
     ]
 
 displayLogin model =

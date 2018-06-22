@@ -1,6 +1,6 @@
 module YoutubeChatNotification exposing (..)
 
-import View
+import View exposing (Broadcast)
 import Notification exposing (NotificationStatus(..))
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
@@ -27,7 +27,7 @@ type alias Model =
   , location : Location
   , requestState : Maybe Uuid
   , auth : Maybe String
-  , liveBroadcast : Maybe Youtube.LiveBroadcast
+  , broadcast : Maybe Broadcast
   }
 
 main =
@@ -49,7 +49,7 @@ init location =
     , location = location
     , requestState = state
     , auth = Nothing
-    , liveBroadcast = Nothing
+    , broadcast = Nothing
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
@@ -80,9 +80,9 @@ update msg model =
       let _ = Debug.log "access token validation failed" err in
       ({model | auth = Nothing}, Cmd.none)
     GotLiveBroadcasts (Ok response) ->
-      let mbroadcast = List.head response.items in
-      ( {model | liveBroadcast = mbroadcast }
-      , mbroadcast |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.snippet.liveChatId) |> Maybe.withDefault Cmd.none
+      let mbroadcast = List.head response.items |> Maybe.map myBroadcast in
+      ( {model | broadcast = mbroadcast }
+      , mbroadcast |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.liveChatId) |> Maybe.withDefault Cmd.none
       )
     GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
@@ -95,6 +95,14 @@ update msg model =
       (model, Cmd.none)
     UI (View.None) ->
       (model, Cmd.none)
+
+myBroadcast : Youtube.LiveBroadcast -> Broadcast
+myBroadcast {snippet} =
+  { title = snippet.title
+  , description = snippet.description
+  , actualStartTime = snippet.actualStartTime
+  , liveChatId = snippet.liveChatId
+  }
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
