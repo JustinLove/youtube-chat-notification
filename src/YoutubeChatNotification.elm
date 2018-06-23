@@ -12,10 +12,14 @@ import Uuid exposing (Uuid)
 import Random.Pcg as Random
 import Http
 import Json.Decode
+import Time exposing (Time)
+
+smallestPollingInterval = 10 * Time.second
 
 type Msg
   = GotNotificationStatus NotificationStatus
   | CurrentUrl Location
+  | MessageUpdate Time
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
@@ -30,6 +34,7 @@ type alias Model =
   , broadcast : Maybe Broadcast
   , messages : List Message
   , messagePageToken : Maybe String
+  , messagePollingInterval : Time
   }
 
 main =
@@ -54,6 +59,7 @@ init location =
     , broadcast = Nothing
     , messages = []
     , messagePageToken = Nothing
+    , messagePollingInterval = Time.second
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
@@ -75,6 +81,8 @@ update msg model =
       )
     CurrentUrl location ->
       ({model | location = location}, Cmd.none)
+    MessageUpdate _ ->
+      (model, updateChatMessages model)
     AuthState uuid ->
       ({model | requestState = Just uuid}, Cmd.none)
     TokenInfo token (Ok info) ->
@@ -99,6 +107,7 @@ update msg model =
       ( { model
         | messages = List.append model.messages received
         , messagePageToken = response.nextPageToken
+        , messagePollingInterval = max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
       , if model.messagePageToken /= Nothing then
         Cmd.batch
@@ -144,6 +153,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch
     [ Notification.status GotNotificationStatus
+    , Time.every model.messagePollingInterval MessageUpdate
     ]
 
 validateTokenUrl : String -> String
