@@ -109,10 +109,17 @@ myBroadcast {snippet} =
 
 myMessage : Youtube.LiveChatMessage -> Message
 myMessage {snippet, authorDetails} =
-  { authorDisplayName = authorDetails.displayName
-  , publishedAt = snippet.publishedAt
-  , displayMessage = snippet.displayMessage |> Maybe.withDefault ""
-  }
+  case snippet of
+    Youtube.TextMessageEvent {publishedAt, messageText} ->
+      { authorDisplayName = authorDetails.displayName
+      , publishedAt = publishedAt
+      , displayMessage = messageText
+      }
+    Youtube.UnknownEvent messageType publishedAt ->
+      { authorDisplayName = "unknown event"
+      , publishedAt = publishedAt
+      , displayMessage = messageType
+      }
 
 subscriptions : Model -> Sub Msg
 subscriptions model =

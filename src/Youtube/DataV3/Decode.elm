@@ -5,6 +5,7 @@ module Youtube.DataV3.Decode exposing
   , sampleLiveBroadcastListResponse
   , LiveChatMessageListResponse
   , LiveChatMessage
+  , LiveChatMessageSnippet(..)
   , liveChatMessageListResponse
   , sampleLiveChatMessageListResponse
   )
@@ -181,29 +182,35 @@ liveChatMessage =
     (field "snippet" liveChatMessageSnippet)
     (field "authorDetails" authorDetails)
 
-type alias LiveChatMessageSnippet =
-  { messageType : String
-  , liveChatId : String
-  , authorChannelId : Maybe String
-  , publishedAt : Time
-  , hasDisplayContent : Bool
-  , displayMessage : Maybe String
-  , textMessageDetails : Maybe String
-  --, messageDeletedDetails : String
-  --, userBannedDetails : UserBannedDetails
-  --, superChatDetails : SuperChatDetails
-  }
+type LiveChatMessageSnippet
+  = TextMessageEvent TextMessageEventDetails
+  | UnknownEvent String Time
 
 liveChatMessageSnippet : Decoder LiveChatMessageSnippet
 liveChatMessageSnippet =
-  succeed LiveChatMessageSnippet
-    |> map2 (|>) (field "type" string)
-    |> map2 (|>) (field "liveChatId" string)
-    |> map2 (|>) (maybe (field "authorChannelId" string))
-    |> map2 (|>) (field "publishedAt" timeStamp)
-    |> map2 (|>) (field "hasDisplayContent" bool)
-    |> map2 (|>) (maybe (field "displayMessage" string))
-    |> map2 (|>) (maybe (at ["textMessageDetails", "messageText"] string))
+  (field "type" string)
+    |> andThen (\messageType ->
+      case messageType of
+        "textMessageEvent" ->
+          map TextMessageEvent textMessageEventDetails
+        _ ->
+          map2 UnknownEvent
+            (succeed messageType)
+            (field "publishedAt" timeStamp)
+      )
+
+type alias TextMessageEventDetails =
+  { publishedAt : Time
+  , authorChannelId : String
+  , messageText : String
+  }
+
+textMessageEventDetails : Decoder TextMessageEventDetails
+textMessageEventDetails =
+  map3 TextMessageEventDetails
+    (field "publishedAt" timeStamp)
+    (field "authorChannelId" string)
+    (at ["textMessageDetails", "messageText"] string)
 
 type alias AuthorDetails =
   { channelId : String
