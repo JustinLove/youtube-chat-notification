@@ -13,12 +13,16 @@ import Random.Pcg as Random
 import Http
 import Json.Decode
 import Time exposing (Time)
+import Task
 
 smallestPollingInterval = 10 * Time.second
+audioNoticeLength = 3 * Time.second
 
 type Msg
   = GotNotificationStatus NotificationStatus
   | CurrentUrl Location
+  | AudioStart Time
+  | AudioEnd Time
   | MessageUpdate Time
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
@@ -35,6 +39,7 @@ type alias Model =
   , messages : List Message
   , messagePageToken : Maybe String
   , messagePollingInterval : Time
+  , audioNotice : Maybe Time
   }
 
 main =
@@ -60,6 +65,7 @@ init location =
     , messages = []
     , messagePageToken = Nothing
     , messagePollingInterval = Time.second
+    , audioNotice = Nothing
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
@@ -81,6 +87,10 @@ update msg model =
       )
     CurrentUrl location ->
       ({model | location = location}, Cmd.none)
+    AudioStart time ->
+      ({model | audioNotice = Just time}, Cmd.none)
+    AudioEnd _ ->
+      ({model | audioNotice = Nothing}, Cmd.none)
     MessageUpdate _ ->
       (model, updateChatMessages model)
     AuthState uuid ->
@@ -109,9 +119,10 @@ update msg model =
         , messagePageToken = response.nextPageToken
         , messagePollingInterval = max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
-      , if model.messagePageToken /= Nothing then
-        Cmd.batch
-          <| List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
+      , if List.length received > 0 && model.messagePageToken /= Nothing then
+          List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
+          |> (::) (Time.now |> Task.perform AudioStart)
+          |> Cmd.batch
         else
           Cmd.none
       )
@@ -154,6 +165,7 @@ subscriptions model =
   Sub.batch
     [ Notification.status GotNotificationStatus
     , Time.every model.messagePollingInterval MessageUpdate
+    , Time.every audioNoticeLength AudioEnd
     ]
 
 validateTokenUrl : String -> String

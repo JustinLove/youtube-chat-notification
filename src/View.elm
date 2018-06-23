@@ -32,6 +32,13 @@ view model =
     [ header [] [loginView model]
     , div [] [text <| toString model.notificationStatus]
     , div [] [text <| (model.broadcast |> Maybe.map .title |> Maybe.withDefault "--")]
+    , if model.audioNotice /= Nothing then
+        audio
+          [ autoplay True
+          , src "406243__stubb__typewriter-ding-near-mono.wav"
+          ] []
+      else
+        text ""
     , button [ onClick Update ] [ text "Update" ]
     , model.messages
       |> List.map messageView
