@@ -90,8 +90,14 @@ update msg model =
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)
     GotLiveChatMessages (Ok response) ->
-      ( {model | messages = response.items |> List.map myMessage}
-      , Cmd.none
+      let
+        received = response.items |> List.map myMessage
+        new = List.drop (List.length model.messages) received
+      in
+      ( {model | messages = received}
+      , Cmd.batch
+        <| List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) new
+
       )
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
