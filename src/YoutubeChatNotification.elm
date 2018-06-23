@@ -25,6 +25,8 @@ type Msg
   | AudioStart Time
   | AudioEnd Time
   | MessageUpdate Time
+  | TokenLifetimeStart Time Time
+  | TokenExpired Time
   | AuthState Uuid
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
@@ -34,12 +36,14 @@ type Msg
 type alias Model =
   { notificationStatus : NotificationStatus
   , location : Location
+  , time : Time
   , requestState : Maybe Uuid
   , auth : Maybe String
+  , authExpires : Maybe Time
   , broadcast : Maybe Broadcast
   , messages : List Message
   , messagePageToken : Maybe String
-  , messagePollingInterval : Time
+  , messagePollingInterval : Maybe Time
   , audioNotice : Maybe Time
   }
 
@@ -60,12 +64,14 @@ init location =
   in
   ( { notificationStatus = Unknown
     , location = location
+    , time = 0
     , requestState = state
     , auth = Nothing
+    , authExpires = Nothing
     , broadcast = Nothing
     , messages = []
     , messagePageToken = Nothing
-    , messagePollingInterval = Time.second
+    , messagePollingInterval = Nothing
     , audioNotice = Nothing
     }
   , Cmd.batch
@@ -92,13 +98,24 @@ update msg model =
       ({model | audioNotice = Just time}, Cmd.none)
     AudioEnd _ ->
       ({model | audioNotice = Nothing}, Cmd.none)
-    MessageUpdate _ ->
-      (model, updateChatMessages model)
+    MessageUpdate time ->
+      ({model | time = time}, updateChatMessages model)
+    TokenLifetimeStart expiresIn time ->
+      ( {model | authExpires = Just (time+expiresIn), time = time}, Cmd.none)
+    TokenExpired _ ->
+      ( {model | auth = Nothing, authExpires = Nothing}
+      , Time.now |> Task.perform AudioStart
+      )
     AuthState uuid ->
       ({model | requestState = Just uuid}, Cmd.none)
     TokenInfo token (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
-      ({model | auth = Just token}, fetchLiveBroadcasts (Just token))
+      ( {model | auth = Just token}
+      , Cmd.batch
+        [ fetchLiveBroadcasts (Just token)
+        , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+        ]
+      )
     TokenInfo _ (Err err) ->
       let _ = Debug.log "access token validation failed" err in
       ({model | auth = Nothing}, Cmd.none)
@@ -130,7 +147,7 @@ update msg model =
       ( { model
         | messages = List.append model.messages received
         , messagePageToken = response.nextPageToken
-        , messagePollingInterval = max smallestPollingInterval (toFloat response.pollingIntervalMillis)
+        , messagePollingInterval = Just <| max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
       , if messagesReceived && not initialBatch then
           List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
@@ -141,7 +158,7 @@ update msg model =
       )
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
-      (model, Cmd.none)
+      ({model | messagePollingInterval = Nothing}, Cmd.none)
     UI (View.Update) ->
       (model, updateChatMessages model)
 
@@ -177,8 +194,15 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch
     [ Notification.status GotNotificationStatus
-    , Time.every model.messagePollingInterval MessageUpdate
-    , Time.every audioNoticeLength AudioEnd
+    , model.messagePollingInterval
+      |> Maybe.map (\t -> Time.every t MessageUpdate)
+      |> Maybe.withDefault Sub.none
+    , model.audioNotice
+      |> Maybe.map (\_ -> Time.every audioNoticeLength AudioEnd)
+      |> Maybe.withDefault Sub.none
+    , model.authExpires
+      |> Maybe.map (\t -> Time.every (t - model.time) TokenExpired)
+      |> Maybe.withDefault Sub.none
     ]
 
 validateTokenUrl : String -> String

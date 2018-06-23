@@ -2,3 +2,13 @@
 - Incognito browsers always return denied
 
 - token refresh
+  - requires offline parameters
+  - only get refresh on first auth (interactive auth?)
+  - may require cleitn secret
+- configurable idle delay
+- disable audio notice
+- configurable smallest update?
+- chat area with auto-scroll
+- actual style
+- social links
+- readme

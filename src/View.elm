@@ -52,6 +52,12 @@ loginView model =
         --[ span [ class "user", title model.self.id ] [ text model.self.displayName ]
         [ text " "
         , a [ href (model.location.origin ++ model.location.pathname) ] [ text "logout" ]
+        , text " expires: "
+        , text <| toString <| round
+          (model.authExpires
+            |> Maybe.map (\t -> (t - model.time) / Time.second)
+            |> Maybe.withDefault 0
+          )
         ]
     Nothing ->
       a [ href (authorizeUrl (urlForRedirect model.location) model.requestState) ] [ text "login" ]
