@@ -12,7 +12,7 @@ import Http
 import Time exposing (Time)
 
 type Msg
-  = None
+  = Update
 
 type alias Broadcast =
   { title : String
@@ -32,6 +32,7 @@ view model =
     [ header [] [loginView model]
     , div [] [text <| toString model.notificationStatus]
     , div [] [text <| (model.broadcast |> Maybe.map .title |> Maybe.withDefault "--")]
+    , button [ onClick Update ] [ text "Update" ]
     , model.messages
       |> List.map messageView
       |> ul []

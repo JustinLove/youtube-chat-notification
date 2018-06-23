@@ -102,8 +102,8 @@ update msg model =
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
       (model, Cmd.none)
-    UI (View.None) ->
-      (model, Cmd.none)
+    UI (View.Update) ->
+      (model, model.broadcast |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.liveChatId) |> Maybe.withDefault Cmd.none)
 
 myBroadcast : Youtube.LiveBroadcast -> Broadcast
 myBroadcast {snippet} =
