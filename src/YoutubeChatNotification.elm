@@ -17,6 +17,7 @@ import Task
 
 smallestPollingInterval = 10 * Time.second
 audioNoticeLength = 3 * Time.second
+audioNoticeIdle = 2 * 60 * Time.second
 
 type Msg
   = GotNotificationStatus NotificationStatus
@@ -113,16 +114,28 @@ update msg model =
     GotLiveChatMessages (Ok response) ->
       let
         received = response.items |> List.map myMessage
+        initialBatch = model.messagePageToken == Nothing
+        messagesReceived = List.length received > 0
+        lastTime = List.head (List.reverse model.messages)
+          |> Maybe.map (.publishedAt)
+          |> Maybe.withDefault 0 
+        newTime = List.head received
+          |> Maybe.map (.publishedAt)
+          |> Maybe.withDefault lastTime
+        idleNotice = if newTime - lastTime > audioNoticeIdle then
+          (Time.now |> Task.perform AudioStart)
+        else
+          Cmd.none
       in
       ( { model
         | messages = List.append model.messages received
         , messagePageToken = response.nextPageToken
         , messagePollingInterval = max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
-      , if List.length received > 0 && model.messagePageToken /= Nothing then
+      , if messagesReceived && not initialBatch then
           List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
-          |> (::) (Time.now |> Task.perform AudioStart)
-          |> Cmd.batch
+            |> (::) idleNotice
+            |> Cmd.batch
         else
           Cmd.none
       )
