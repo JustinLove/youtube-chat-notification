@@ -29,6 +29,7 @@ type alias Model =
   , auth : Maybe String
   , broadcast : Maybe Broadcast
   , messages : List Message
+  , messagePageToken : Maybe String
   }
 
 main =
@@ -52,6 +53,7 @@ init location =
     , auth = Nothing
     , broadcast = Nothing
     , messages = []
+    , messagePageToken = Nothing
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
@@ -82,28 +84,33 @@ update msg model =
       let _ = Debug.log "access token validation failed" err in
       ({model | auth = Nothing}, Cmd.none)
     GotLiveBroadcasts (Ok response) ->
-      let mbroadcast = List.head response.items |> Maybe.map myBroadcast in
-      ( {model | broadcast = mbroadcast }
-      , mbroadcast |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.liveChatId) |> Maybe.withDefault Cmd.none
-      )
+      let
+        mbroadcast = List.head response.items |> Maybe.map myBroadcast
+        m2 = {model | broadcast = mbroadcast }
+      in
+      (m2, updateChatMessages m2)
     GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)
     GotLiveChatMessages (Ok response) ->
       let
         received = response.items |> List.map myMessage
-        new = List.drop (List.length model.messages) received
       in
-      ( {model | messages = received}
-      , Cmd.batch
-        <| List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) new
-
+      ( { model
+        | messages = List.append model.messages received
+        , messagePageToken = response.nextPageToken
+        }
+      , if model.messagePageToken /= Nothing then
+        Cmd.batch
+          <| List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
+        else
+          Cmd.none
       )
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
       (model, Cmd.none)
     UI (View.Update) ->
-      (model, model.broadcast |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.liveChatId) |> Maybe.withDefault Cmd.none)
+      (model, updateChatMessages model)
 
 myBroadcast : Youtube.LiveBroadcast -> Broadcast
 myBroadcast {snippet} =
@@ -126,6 +133,12 @@ myMessage {snippet, authorDetails} =
       , publishedAt = publishedAt
       , displayMessage = messageType
       }
+
+updateChatMessages : Model -> Cmd Msg
+updateChatMessages model =
+  model.broadcast
+    |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.liveChatId model.messagePageToken)
+    |> Maybe.withDefault Cmd.none
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -162,17 +175,22 @@ fetchLiveBroadcasts auth =
     , url = liveBroadcastsUrl
     }
 
-liveChatMessagesUrl : String -> String
-liveChatMessagesUrl liveChatId =
-  "https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=" ++ liveChatId ++ "&key=" ++ YoutubeId.apikey
+liveChatMessagesUrl : String -> Maybe String -> String
+liveChatMessagesUrl liveChatId mpageToken=
+  let
+    page = mpageToken
+      |> Maybe.map (\token -> "&pageToken="++token)
+      |> Maybe.withDefault ""
+  in
+  "https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=" ++ liveChatId ++ page ++ "&key=" ++ YoutubeId.apikey
 
-fetchLiveChatMessages : Maybe String -> String -> Cmd Msg
-fetchLiveChatMessages auth liveChatId =
+fetchLiveChatMessages : Maybe String -> String -> Maybe String -> Cmd Msg
+fetchLiveChatMessages auth liveChatId mpageToken =
   youtube
     { auth = auth
     , decoder = Youtube.liveChatMessageListResponse
     , tagger = GotLiveChatMessages
-    , url = liveChatMessagesUrl liveChatId
+    , url = liveChatMessagesUrl liveChatId mpageToken
     }
 
 youtube :
