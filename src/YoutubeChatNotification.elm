@@ -176,7 +176,8 @@ update msg model =
 
 resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
 resolveLoaded state model =
-  if model.responseState == state.authState then
+  if YoutubeId.checkOauthState == False
+     || model.responseState == state.authState then
     ( model
     , case model.auth of
       Just token -> validateToken token

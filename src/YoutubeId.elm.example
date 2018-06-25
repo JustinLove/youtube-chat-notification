@@ -1,5 +1,5 @@
-module YoutubeId exposing (clientId, apiKey)
+module YoutubeId exposing (clientId, apiKey, checkOauthState)
 
 clientId = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 apikey = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-
+checkOauthState = True
