@@ -14,6 +14,15 @@
 <script type="text/javascript">
   var app = Elm.YoutubeChatNotification.fullscreen()
 
+  var key = 'youtube-chat-notification'
+
+  app.ports.localStorageSave.subscribe(function(value) {
+    localStorage.setItem(key, value)
+  })
+
+  var loaded = localStorage.getItem(key)
+  app.ports.localStorageLoaded.send(loaded)
+
   if (Notification) {
     app.ports.notificationStatus.send(Notification.permission)
   } else {

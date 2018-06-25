@@ -5,6 +5,10 @@ import Notification exposing (NotificationStatus(..))
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
 import Youtube.DataV3.Decode as Youtube
+import LocalStorage
+import Persist exposing (Persist)
+import Persist.Encode
+import Persist.Decode
 
 import Html
 import Navigation exposing (Location)
@@ -20,7 +24,8 @@ audioNoticeLength = 3 * Time.second
 audioNoticeIdle = 2 * 60 * Time.second
 
 type Msg
-  = GotNotificationStatus NotificationStatus
+  = Loaded (Maybe Persist)
+  | GotNotificationStatus NotificationStatus
   | CurrentUrl Location
   | AudioStart Time
   | AudioEnd Time
@@ -37,6 +42,7 @@ type alias Model =
   { notificationStatus : NotificationStatus
   , location : Location
   , time : Time
+  , responseState : Maybe Uuid
   , requestState : Maybe Uuid
   , auth : Maybe String
   , authExpires : Maybe Time
@@ -65,8 +71,9 @@ init location =
   ( { notificationStatus = Unknown
     , location = location
     , time = 0
-    , requestState = state
-    , auth = Nothing
+    , responseState = state
+    , requestState = Nothing
+    , auth = auth
     , authExpires = Nothing
     , broadcast = Nothing
     , messages = []
@@ -76,15 +83,19 @@ init location =
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
-    , case auth of
-      Just token -> validateToken token
-      Nothing -> Cmd.none
     ]
   )
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
+    Loaded mstate ->
+      ( case mstate of
+        Just state ->
+          resolveLoaded state model
+        Nothing ->
+          (model, Cmd.none)
+      )
     GotNotificationStatus status ->
       ({model | notificationStatus = status}
       , if status == Unknown then
@@ -107,7 +118,8 @@ update msg model =
       , Time.now |> Task.perform AudioStart
       )
     AuthState uuid ->
-      ({model | requestState = Just uuid}, Cmd.none)
+      {model | requestState = Just uuid}
+        |> persist
     TokenInfo token (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
       ( {model | auth = Just token}
@@ -162,6 +174,30 @@ update msg model =
     UI (View.Update) ->
       (model, updateChatMessages model)
 
+resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
+resolveLoaded state model =
+  if model.responseState == state.authState then
+    ( model
+    , case model.auth of
+      Just token -> validateToken token
+      Nothing -> Cmd.none
+    )
+  else
+    let _ = Debug.log "auth state mismatch" [model.responseState, state.authState] in
+    ( { model | auth = Nothing }
+    , Cmd.none
+    )
+
+persist : Model -> (Model, Cmd Msg)
+persist model =
+  (model, saveState model)
+
+saveState : Model -> Cmd Msg
+saveState model =
+  Persist model.requestState
+    |> Persist.Encode.persist
+    |> LocalStorage.saveJson
+
 myBroadcast : Youtube.LiveBroadcast -> Broadcast
 myBroadcast {snippet} =
   { title = snippet.title
@@ -193,7 +229,8 @@ updateChatMessages model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch
-    [ Notification.status GotNotificationStatus
+    [ LocalStorage.loadedJson Persist.Decode.persist Loaded
+    , Notification.status GotNotificationStatus
     , model.messagePollingInterval
       |> Maybe.map (\t -> Time.every t MessageUpdate)
       |> Maybe.withDefault Sub.none
