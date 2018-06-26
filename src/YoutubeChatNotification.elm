@@ -1,6 +1,6 @@
 module YoutubeChatNotification exposing (..)
 
-import View exposing (Broadcast, Message, urlForRedirect)
+import View exposing (Message, urlForRedirect)
 import Notification exposing (NotificationStatus(..))
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
@@ -50,7 +50,8 @@ type alias Model =
   , auth : Maybe String
   , authExpires : Maybe Time
   , refresh : Maybe String
-  , broadcast : Maybe Broadcast
+  , title : Maybe String
+  , liveChatId : Maybe String
   , messages : List Message
   , messagePageToken : Maybe String
   , messagePollingInterval : Maybe Time
@@ -69,9 +70,13 @@ init : Location -> (Model, Cmd Msg)
 init location =
   let
     auth = extractHashArgument "access_token" location
-    state = extractSearchArgument "state" location
-      |> Maybe.andThen Uuid.fromString
     code = extractSearchArgument "code" location
+    state = case code of
+      Just _ -> extractSearchArgument "state" location
+        |> Maybe.andThen Uuid.fromString
+      Nothing -> extractHashArgument "state" location
+        |> Maybe.andThen Uuid.fromString
+    liveChatId = extractSearchArgument "liveChatId" location
   in
   ( { notificationStatus = Unknown
     , location = location
@@ -81,7 +86,8 @@ init location =
     , auth = auth
     , authExpires = Nothing
     , refresh = Nothing
-    , broadcast = Nothing
+    , title = Nothing
+    , liveChatId = liveChatId
     , messages = []
     , messagePageToken = Nothing
     , messagePollingInterval = Nothing
@@ -174,8 +180,12 @@ update msg model =
       ({model | auth = Nothing}, Cmd.none)
     GotLiveBroadcasts (Ok response) ->
       let
-        mbroadcast = List.head response.items |> Maybe.map myBroadcast
-        m2 = {model | broadcast = mbroadcast }
+        mbroadcast = List.head response.items |> Maybe.map .snippet
+        m2 =
+          { model
+          | liveChatId = mbroadcast |> Maybe.map .liveChatId
+          , title = mbroadcast |> Maybe.map .title
+          }
       in
       (m2, updateChatMessages m2)
     GotLiveBroadcasts (Err err) ->
@@ -214,9 +224,7 @@ update msg model =
       ({model | messagePollingInterval = Nothing}, Cmd.none)
     UI (View.Update) ->
       ( model
-      , case model.refresh of
-        Just token -> refreshToken token
-        Nothing -> Debug.log "no refresh token" Cmd.none
+      , updateChatMessages model
       )
     UI (View.LogOut) ->
       ( {model | auth = Nothing, refresh = Nothing}
@@ -250,14 +258,6 @@ saveState model =
     |> Persist.Encode.persist
     |> LocalStorage.saveJson
 
-myBroadcast : Youtube.LiveBroadcast -> Broadcast
-myBroadcast {snippet} =
-  { title = snippet.title
-  , description = snippet.description
-  , actualStartTime = snippet.actualStartTime
-  , liveChatId = snippet.liveChatId
-  }
-
 myMessage : Youtube.LiveChatMessage -> Message
 myMessage {snippet, authorDetails} =
   case snippet of
@@ -274,8 +274,8 @@ myMessage {snippet, authorDetails} =
 
 updateChatMessages : Model -> Cmd Msg
 updateChatMessages model =
-  model.broadcast
-    |> Maybe.map (\cast -> fetchLiveChatMessages model.auth cast.liveChatId model.messagePageToken)
+  model.liveChatId
+    |> Maybe.map (\id -> fetchLiveChatMessages model.auth id model.messagePageToken)
     |> Maybe.withDefault Cmd.none
 
 subscriptions : Model -> Sub Msg

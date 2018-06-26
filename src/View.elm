@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Broadcast, Message, view, urlForRedirect)
+module View exposing (Msg(..), Message, view, urlForRedirect)
 
 import YoutubeId
 import Notification exposing (NotificationStatus(..))
@@ -15,13 +15,6 @@ type Msg
   = Update
   | LogOut
 
-type alias Broadcast =
-  { title : String
-  , description : String
-  , actualStartTime : Maybe Time
-  , liveChatId : String
-  }
-
 type alias Message =
   { authorDisplayName : String
   , publishedAt : Time
@@ -32,7 +25,7 @@ view model =
   div []
     [ header [] [loginView model]
     , div [] [text <| toString model.notificationStatus]
-    , div [] [text <| (model.broadcast |> Maybe.map .title |> Maybe.withDefault "--")]
+    , div [] [text <| (model.title |> Maybe.withDefault "--")]
     , if model.audioNotice /= Nothing then
         audio
           [ autoplay True
@@ -68,9 +61,7 @@ authorizeUrl redirectUri authState =
   "https://accounts.google.com/o/oauth2/auth"
     ++ "?client_id=" ++ YoutubeId.clientId
     ++ "&redirect_uri=" ++ (Http.encodeUri redirectUri)
-    ++ "&response_type=code"
-    ++ "&access_type=offline"
-    --++ "&approval_prompt=force"
+    ++ "&response_type=token"
     ++ "&scope=" ++ (Http.encodeUri "https://www.googleapis.com/auth/youtube.readonly")
     ++ (case authState of
       Just uuid -> "&state=" ++ (Uuid.toString uuid)
