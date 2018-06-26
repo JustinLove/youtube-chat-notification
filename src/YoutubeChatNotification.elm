@@ -34,6 +34,7 @@ type Msg
   | TokenExpired Time
   | AuthState Uuid
   | AccessToken (Result Http.Error (GoogleApis.AccessToken))
+  | RefreshToken (Result Http.Error (GoogleApis.AccessToken))
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
   | GotLiveChatMessages (Result Http.Error (Youtube.LiveChatMessageListResponse))
@@ -133,11 +134,22 @@ update msg model =
       , Cmd.batch
         [ fetchLiveBroadcasts (Just info.access_token)
         , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+        , case info.refresh_token of
+          Just token -> refreshToken token
+          Nothing -> Debug.log "no refresh token" Cmd.none
         ]
       )
     AccessToken (Err err) ->
       let _ = Debug.log "access token exchange failed" err in
-      ({model | auth = Nothing}, Cmd.none)
+      ({model | auth = Nothing, refresh = Nothing}, Cmd.none)
+    RefreshToken (Ok info) ->
+      let _ = Debug.log "token expires in " info.expires_in in
+      ( {model | auth = Just info.access_token}
+      , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+      )
+    RefreshToken (Err err) ->
+      let _ = Debug.log "refresh token failed" err in
+      ({model | auth = Nothing, refresh = Nothing}, Cmd.none)
     TokenInfo token (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
       ( {model | auth = Just token}
@@ -275,6 +287,23 @@ exchangeToken location code =
     , headers = []
     , url = YoutubeId.oauthProxyUrl
     , body = exchangeTokenBody location code
+    , expect = Http.expectJson GoogleApis.accessToken
+    , timeout = Nothing
+    , withCredentials = False
+    }
+
+refreshTokenBody : String -> Http.Body
+refreshTokenBody token =
+  Http.stringBody "application/x-www-form-urlencoded" <|
+    ("refresh_token=" ++ token ++ "&grant_type=refresh_token")
+
+refreshToken : String -> Cmd Msg
+refreshToken token =
+  Http.send RefreshToken <| Http.request
+    { method = "POST"
+    , headers = []
+    , url = YoutubeId.oauthProxyUrl
+    , body = refreshTokenBody token
     , expect = Http.expectJson GoogleApis.accessToken
     , timeout = Nothing
     , withCredentials = False

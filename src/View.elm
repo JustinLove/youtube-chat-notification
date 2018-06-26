@@ -69,6 +69,7 @@ authorizeUrl redirectUri authState =
     ++ "&redirect_uri=" ++ (Http.encodeUri redirectUri)
     ++ "&response_type=code"
     ++ "&acess_type=offline"
+    ++ "&approval_prompt=force"
     ++ "&scope=" ++ (Http.encodeUri "https://www.googleapis.com/auth/youtube.readonly")
     ++ (case authState of
       Just uuid -> "&state=" ++ (Uuid.toString uuid)
