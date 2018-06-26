@@ -77,26 +77,33 @@ init location =
       Nothing -> extractHashArgument "state" location
         |> Maybe.andThen Uuid.fromString
     liveChatId = extractSearchArgument "liveChatId" location
+    title = extractSearchArgument "title" location
+      |> Maybe.andThen Http.decodeUri
+    model =
+      { notificationStatus = Unknown
+      , location = location
+      , time = 0
+      , responseState = state
+      , requestState = Nothing
+      , auth = auth
+      , authExpires = Nothing
+      , refresh = Nothing
+      , title = title
+      , liveChatId = liveChatId
+      , messages = []
+      , messagePageToken = Nothing
+      , messagePollingInterval = Nothing
+      , audioNotice = Nothing
+      }
   in
-  ( { notificationStatus = Unknown
-    , location = location
-    , time = 0
-    , responseState = state
-    , requestState = Nothing
-    , auth = auth
-    , authExpires = Nothing
-    , refresh = Nothing
-    , title = Nothing
-    , liveChatId = liveChatId
-    , messages = []
-    , messagePageToken = Nothing
-    , messagePollingInterval = Nothing
-    , audioNotice = Nothing
-    }
+  ( model
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
     , case code of
       Just string -> exchangeToken location string
+      Nothing -> Cmd.none
+    , case liveChatId of
+      Just id -> updateChatMessages model
       Nothing -> Cmd.none
     ]
   )
@@ -187,7 +194,7 @@ update msg model =
           , title = mbroadcast |> Maybe.map .title
           }
       in
-      (m2, updateChatMessages m2)
+      (m2, Navigation.newUrl <| createPath m2)
     GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)
@@ -447,3 +454,19 @@ extractSearchArgument key location =
     |> List.head
     |> Maybe.andThen List.tail
     |> Maybe.andThen List.head
+
+createQueryString : Model -> String
+createQueryString model =
+  [ case model.title of
+      Just title -> "title=" ++ title
+      Nothing -> ""
+  , case model.liveChatId of
+      Just id -> "liveChatId=" ++ id
+      Nothing -> ""
+  ]
+    |> List.filter ((/=) "")
+    |> String.join "&"
+
+createPath : Model -> String
+createPath model =
+  model.location.pathname ++ "?" ++ (createQueryString model)
