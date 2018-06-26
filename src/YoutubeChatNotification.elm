@@ -123,8 +123,10 @@ update msg model =
     TokenLifetimeStart expiresIn time ->
       ( {model | authExpires = Just (time+expiresIn), time = time}, Cmd.none)
     TokenExpired _ ->
-      ( {model | auth = Nothing, authExpires = Nothing}
-      , Time.now |> Task.perform AudioStart
+      ( {model | authExpires = Nothing}
+      , case model.refresh of
+        Just token -> refreshToken token
+        Nothing -> Debug.log "no refresh token" Cmd.none
       )
     AuthState uuid ->
       {model | requestState = Just uuid}
