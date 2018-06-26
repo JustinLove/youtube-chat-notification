@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Broadcast, Message, view)
+module View exposing (Msg(..), Broadcast, Message, view, urlForRedirect)
 
 import YoutubeId
 import Notification exposing (NotificationStatus(..))
@@ -67,7 +67,8 @@ authorizeUrl redirectUri authState =
   "https://accounts.google.com/o/oauth2/auth"
     ++ "?client_id=" ++ YoutubeId.clientId
     ++ "&redirect_uri=" ++ (Http.encodeUri redirectUri)
-    ++ "&response_type=token"
+    ++ "&response_type=code"
+    ++ "&acess_type=offline"
     ++ "&scope=" ++ (Http.encodeUri "https://www.googleapis.com/auth/youtube.readonly")
     ++ (case authState of
       Just uuid -> "&state=" ++ (Uuid.toString uuid)
@@ -78,6 +79,12 @@ urlForRedirect location =
   location.href
     |> String.dropRight (String.length location.hash)
     |> String.dropRight (String.length location.search)
+    |> chop "#"
+    |> chop "?"
+
+chop : String -> String -> String
+chop char s =
+  if String.right 1 s == char then String.dropRight 1 s else s
 
 messageView : Message -> Html msg
 messageView message =

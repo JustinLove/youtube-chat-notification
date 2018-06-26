@@ -1,5 +1,6 @@
-module YoutubeId exposing (clientId, apiKey, checkOauthState)
+module YoutubeId exposing (clientId, apiKey, oauthProxyUrl, checkOauthState)
 
 clientId = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 apikey = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+oauthProxyUrl = "https://xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 checkOauthState = True

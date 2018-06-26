@@ -1,6 +1,6 @@
 module YoutubeChatNotification exposing (..)
 
-import View exposing (Broadcast, Message)
+import View exposing (Broadcast, Message, urlForRedirect)
 import Notification exposing (NotificationStatus(..))
 import YoutubeId
 import GoogleApis.Oauth2V1.Decode as GoogleApis
@@ -33,6 +33,7 @@ type Msg
   | TokenLifetimeStart Time Time
   | TokenExpired Time
   | AuthState Uuid
+  | AccessToken (Result Http.Error (GoogleApis.AccessToken))
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
   | GotLiveChatMessages (Result Http.Error (Youtube.LiveChatMessageListResponse))
@@ -46,6 +47,7 @@ type alias Model =
   , requestState : Maybe Uuid
   , auth : Maybe String
   , authExpires : Maybe Time
+  , refresh : Maybe String
   , broadcast : Maybe Broadcast
   , messages : List Message
   , messagePageToken : Maybe String
@@ -65,8 +67,9 @@ init : Location -> (Model, Cmd Msg)
 init location =
   let
     auth = extractHashArgument "access_token" location
-    state = extractHashArgument "state" location
+    state = extractSearchArgument "state" location
       |> Maybe.andThen Uuid.fromString
+    code = extractSearchArgument "code" location
   in
   ( { notificationStatus = Unknown
     , location = location
@@ -75,6 +78,7 @@ init location =
     , requestState = Nothing
     , auth = auth
     , authExpires = Nothing
+    , refresh = Nothing
     , broadcast = Nothing
     , messages = []
     , messagePageToken = Nothing
@@ -83,6 +87,9 @@ init location =
     }
   , Cmd.batch
     [ Random.generate AuthState Uuid.uuidGenerator
+    , case code of
+      Just string -> exchangeToken location string
+      Nothing -> Cmd.none
     ]
   )
 
@@ -120,6 +127,17 @@ update msg model =
     AuthState uuid ->
       {model | requestState = Just uuid}
         |> persist
+    AccessToken (Ok info) ->
+      let _ = Debug.log "token expires in " info.expires_in in
+      ( {model | auth = Just info.access_token, refresh = info.refresh_token}
+      , Cmd.batch
+        [ fetchLiveBroadcasts (Just info.access_token)
+        , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+        ]
+      )
+    AccessToken (Err err) ->
+      let _ = Debug.log "access token exchange failed" err in
+      ({model | auth = Nothing}, Cmd.none)
     TokenInfo token (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
       ( {model | auth = Just token}
@@ -243,6 +261,25 @@ subscriptions model =
       |> Maybe.withDefault Sub.none
     ]
 
+exchangeTokenBody : Location -> String -> Http.Body
+exchangeTokenBody location code =
+  Http.stringBody "application/x-www-form-urlencoded" <|
+    ("code=" ++ code ++
+    "&redirect_uri=" ++ (Http.encodeUri (urlForRedirect location)) ++
+    "&grant_type=authorization_code")
+
+exchangeToken : Location -> String -> Cmd Msg
+exchangeToken location code =
+  Http.send AccessToken <| Http.request
+    { method = "POST"
+    , headers = []
+    , url = YoutubeId.oauthProxyUrl
+    , body = exchangeTokenBody location code
+    , expect = Http.expectJson GoogleApis.accessToken
+    , timeout = Nothing
+    , withCredentials = False
+    }
+
 validateTokenUrl : String -> String
 validateTokenUrl token =
   "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" ++ token
@@ -318,6 +355,21 @@ authHeaders auth =
 extractHashArgument : String -> Location -> Maybe String
 extractHashArgument key location =
   location.hash
+    |> String.dropLeft 1
+    |> String.split "&"
+    |> List.map (String.split "=")
+    |> List.filter (\x -> case List.head x of
+      Just s ->
+        s == key
+      Nothing ->
+        False)
+    |> List.head
+    |> Maybe.andThen List.tail
+    |> Maybe.andThen List.head
+
+extractSearchArgument : String -> Location -> Maybe String
+extractSearchArgument key location =
+  location.search
     |> String.dropLeft 1
     |> String.split "&"
     |> List.map (String.split "=")
