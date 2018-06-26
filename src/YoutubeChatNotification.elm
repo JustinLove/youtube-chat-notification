@@ -35,6 +35,7 @@ type Msg
   | AuthState Uuid
   | AccessToken (Result Http.Error (GoogleApis.AccessToken))
   | RefreshToken (Result Http.Error (GoogleApis.AccessToken))
+  | Revoked (Result Http.Error String)
   | TokenInfo String (Result Http.Error (GoogleApis.TokenInfo))
   | GotLiveBroadcasts (Result Http.Error (Youtube.LiveBroadcastListResponse))
   | GotLiveChatMessages (Result Http.Error (Youtube.LiveChatMessageListResponse))
@@ -129,14 +130,14 @@ update msg model =
       {model | requestState = Just uuid}
         |> persist
     AccessToken (Ok info) ->
-      let _ = Debug.log "token expires in " info.expires_in in
+      let
+        _ = Debug.log "token expires in " info.expires_in
+        _ = Debug.log "refresh token" (info.refresh_token /= Nothing)
+      in
       ( {model | auth = Just info.access_token, refresh = info.refresh_token}
       , Cmd.batch
         [ fetchLiveBroadcasts (Just info.access_token)
         , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
-        , case info.refresh_token of
-          Just token -> refreshToken token
-          Nothing -> Debug.log "no refresh token" Cmd.none
         ]
       )
     AccessToken (Err err) ->
@@ -150,6 +151,14 @@ update msg model =
     RefreshToken (Err err) ->
       let _ = Debug.log "refresh token failed" err in
       ({model | auth = Nothing, refresh = Nothing}, Cmd.none)
+    Revoked (Ok _) ->
+      let _ = Debug.log "token revoked" "" in
+      ( {model | auth = Nothing, refresh = Nothing}
+      , Cmd.none
+      )
+    Revoked (Err err) ->
+      let _ = Debug.log "revoke token failed" err in
+      (model, Cmd.none)
     TokenInfo token (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
       ( {model | auth = Just token}
@@ -202,7 +211,17 @@ update msg model =
       let _ = Debug.log "fetch chat failed" err in
       ({model | messagePollingInterval = Nothing}, Cmd.none)
     UI (View.Update) ->
-      (model, updateChatMessages model)
+      ( model
+      , case model.refresh of
+        Just token -> refreshToken token
+        Nothing -> Debug.log "no refresh token" Cmd.none
+      )
+    UI (View.LogOut) ->
+      ( {model | auth = Nothing, refresh = Nothing}
+      , case model.auth of
+          Just token -> revokeToken token
+          Nothing -> Cmd.none
+      )
 
 resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
 resolveLoaded state model =
@@ -305,6 +324,22 @@ refreshToken token =
     , url = YoutubeId.oauthProxyUrl
     , body = refreshTokenBody token
     , expect = Http.expectJson GoogleApis.accessToken
+    , timeout = Nothing
+    , withCredentials = False
+    }
+
+revokeTokenUrl : String -> String
+revokeTokenUrl token =
+  "https://accounts.google.com/o/oauth2/revoke?token=" ++ token
+
+revokeToken : String -> Cmd Msg
+revokeToken token =
+  Http.send Revoked <| Http.request
+    { method = "GET"
+    , headers = []
+    , url = revokeTokenUrl token
+    , body = Http.emptyBody
+    , expect = Http.expectString
     , timeout = Nothing
     , withCredentials = False
     }

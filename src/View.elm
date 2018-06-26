@@ -13,6 +13,7 @@ import Time exposing (Time)
 
 type Msg
   = Update
+  | LogOut
 
 type alias Broadcast =
   { title : String
@@ -51,7 +52,7 @@ loginView model =
       span []
         --[ span [ class "user", title model.self.id ] [ text model.self.displayName ]
         [ text " "
-        , a [ href (model.location.origin ++ model.location.pathname) ] [ text "logout" ]
+        , button [ onClick LogOut ] [ text "Log out" ]
         , text " expires: "
         , text <| toString <| round
           (model.authExpires
@@ -68,8 +69,8 @@ authorizeUrl redirectUri authState =
     ++ "?client_id=" ++ YoutubeId.clientId
     ++ "&redirect_uri=" ++ (Http.encodeUri redirectUri)
     ++ "&response_type=code"
-    ++ "&acess_type=offline"
-    ++ "&approval_prompt=force"
+    ++ "&access_type=offline"
+    --++ "&approval_prompt=force"
     ++ "&scope=" ++ (Http.encodeUri "https://www.googleapis.com/auth/youtube.readonly")
     ++ (case authState of
       Just uuid -> "&state=" ++ (Uuid.toString uuid)

@@ -1,11 +1,8 @@
 - file:// pages always stay permission unknown
 - Incognito browsers always return denied
 
-- token refresh
-  - requires offline parameters
-  - only get refresh on first auth (interactive auth?)
-  - may require cleitn secret
 - proxy url maybe, do temporary login if unavailable
+- polling does not check if logged in
 - configurable idle delay
 - disable audio notice
 - configurable smallest update?
