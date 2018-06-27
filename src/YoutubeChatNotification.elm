@@ -19,7 +19,7 @@ import Json.Decode
 import Time exposing (Time)
 import Task
 
-pollingInterval = 10 * Time.second
+smallestPollingInterval = 10 * Time.second
 audioNoticeLength = 3 * Time.second
 audioNoticeIdle = 2 * 60 * Time.second
 
@@ -217,7 +217,7 @@ update msg model =
       ( { model
         | messages = List.append model.messages received
         , messagePageToken = response.nextPageToken
-        , messagePollingInterval = Just pollingInterval
+        , messagePollingInterval = Just <| max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
       , if messagesReceived && not initialBatch then
           List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
