@@ -20,11 +20,35 @@ type alias Message =
   , displayMessage : String
   }
 
+css = """
+body {background-color: #111; color: #ccc; margin: 0;}
+a:link, a:visited { color: #56f; }
+a:hover, a:active { color: #ccc; }
+header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  background-color: #444;
+  margin: 0;
+  padding: 0.5em;
+}
+.stream-title {font-weight: bold;}
+.chat-area {
+  list-style-type: none;
+  margin: 0.5em;
+  padding: 0;
+}
+.chat-author {color: #56f; font-weight: bold;}
+"""
+
 view model =
   div []
-    [ header [] [loginView model]
-    , div [] [text <| toString model.notificationStatus]
-    , div [] [text <| (model.title |> Maybe.withDefault "--")]
+    [ node "style" [] [ text css ]
+    , header []
+      [ loginView model
+      , div [ class "stream-title" ] [text <| (model.title |> Maybe.withDefault "--")]
+      , div [ class "notification-status" ] [text <| toString model.notificationStatus]
+      ]
     , if model.audioNotice /= Nothing then
         audio
           [ autoplay True
@@ -34,7 +58,7 @@ view model =
         text ""
     , model.messages
       |> List.map messageView
-      |> ul []
+      |> ul [ class "chat-area"]
     ]
 
 loginView model =
@@ -79,8 +103,8 @@ chop char s =
 
 messageView : Message -> Html msg
 messageView message =
-  li []
-    [ text message.authorDisplayName
-    , text ": "
-    , text message.displayMessage
+  li [ class "chat-event" ]
+    [ span [ class "chat-author" ] [ text message.authorDisplayName]
+    , text " "
+    , span [ class "chat-message" ] [ text message.displayMessage ]
     ]
