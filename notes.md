@@ -1,7 +1,6 @@
 - file:// pages always stay permission unknown
 - Incognito browsers always return denied
 
-- chat area with auto-scroll
 - toggle popup notifications
 - save settings
 - social links

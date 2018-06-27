@@ -37,10 +37,15 @@ header {
 }
 .stream-title {font-weight: bold;}
 .config-audio-notice-idle input {width: 4em;}
-.chat-area {
+#chat-area {
   list-style-type: none;
+  overflow: auto;
+  width: 100%;
   margin: 0.5em;
   padding: 0;
+  position: absolute;
+  top: 3em;
+  bottom: 0;
 }
 .chat-author {color: #56f; font-weight: bold;}
 """
@@ -87,7 +92,7 @@ view model =
         text ""
     , model.messages
       |> List.map messageView
-      |> ul [ class "chat-area"]
+      |> ul [ id "chat-area"]
     ]
 
 loginView model =

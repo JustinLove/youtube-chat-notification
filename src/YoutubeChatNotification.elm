@@ -18,13 +18,15 @@ import Http
 import Json.Decode
 import Time exposing (Time)
 import Task
+import Dom.Scroll
 
 smallestPollingInterval = 10 * Time.second
 audioNoticeLength = 3 * Time.second
 defaultAudioNoticeIdle = 2 * 60
 
 type Msg
-  = Loaded (Maybe Persist)
+  = Noop
+  | Loaded (Maybe Persist)
   | GotNotificationStatus NotificationStatus
   | CurrentUrl Location
   | AudioStart Time
@@ -115,6 +117,7 @@ init location =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
+    Noop -> (model, Cmd.none)
     Loaded mstate ->
       ( case mstate of
         Just state ->
@@ -223,12 +226,18 @@ update msg model =
         , messagePageToken = response.nextPageToken
         , messagePollingInterval = Just <| max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
-      , if messagesReceived && not initialBatch then
-          List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
-            |> (::) idleNotice
-            |> Cmd.batch
-        else
-          Cmd.none
+      , Cmd.batch
+        [ if messagesReceived && not initialBatch then
+            List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
+              |> (::) idleNotice
+              |> Cmd.batch
+          else
+            Cmd.none
+        , if messagesReceived then
+            Task.attempt (always Noop) <| Dom.Scroll.toBottom "chat-area"
+          else
+            Cmd.none
+        ]
       )
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
