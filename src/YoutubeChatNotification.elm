@@ -21,7 +21,7 @@ import Task
 
 smallestPollingInterval = 10 * Time.second
 audioNoticeLength = 3 * Time.second
-audioNoticeIdle = 2 * 60 * Time.second
+defaultAudioNoticeIdle = 2 * 60
 
 type Msg
   = Loaded (Maybe Persist)
@@ -55,6 +55,7 @@ type alias Model =
   , messages : List Message
   , messagePageToken : Maybe String
   , messagePollingInterval : Maybe Time
+  , audioNoticeIdle : Int
   , audioNotice : Maybe Time
   }
 
@@ -93,6 +94,7 @@ init location =
       , messages = []
       , messagePageToken = Nothing
       , messagePollingInterval = Nothing
+      , audioNoticeIdle = defaultAudioNoticeIdle
       , audioNotice = Nothing
       }
   in
@@ -209,7 +211,7 @@ update msg model =
         newTime = List.head received
           |> Maybe.map (.publishedAt)
           |> Maybe.withDefault lastTime
-        idleNotice = if newTime - lastTime > audioNoticeIdle then
+        idleNotice = if newTime - lastTime > ((toFloat model.audioNoticeIdle) * Time.second) then
           (Time.now |> Task.perform AudioStart)
         else
           Cmd.none
@@ -235,6 +237,8 @@ update msg model =
           Just token -> revokeToken token
           Nothing -> Cmd.none
       )
+    UI (View.SetAudioNoticeIdle time) ->
+      ( {model | audioNoticeIdle = time}, Cmd.none)
 
 resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
 resolveLoaded state model =

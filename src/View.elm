@@ -5,14 +5,16 @@ import Notification exposing (NotificationStatus(..))
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, on)
 import Navigation exposing (Location)
 import Uuid exposing (Uuid)
 import Http
 import Time exposing (Time)
+import Json.Decode
 
 type Msg
   = LogOut
+  | SetAudioNoticeIdle Int
 
 type alias Message =
   { authorDisplayName : String
@@ -33,6 +35,7 @@ header {
   padding: 0.5em;
 }
 .stream-title {font-weight: bold;}
+.config-audio-notice-idle input {width: 4em;}
 .chat-area {
   list-style-type: none;
   margin: 0.5em;
@@ -47,6 +50,18 @@ view model =
     , header []
       [ loginView model
       , div [ class "stream-title" ] [text <| (model.title |> Maybe.withDefault "--")]
+    , div [ class "config-audio-notice-idle" ]
+      [ input
+        [ value <| toString model.audioNoticeIdle
+        , type_ "number"
+        , id "audio-notice-idle"
+        , name "audio-notice-idle"
+        , Html.Attributes.min "0"
+        , on "change" <| targetValue int SetAudioNoticeIdle
+        ] []
+      , text " "
+      , label [ for "audio-notice-idle" ] [ text "Chat Idle for Alarm" ]
+      ]
       , div [ class "notification-status" ] [text <| toString model.notificationStatus]
       ]
     , if model.audioNotice /= Nothing then
@@ -108,3 +123,17 @@ messageView message =
     , text " "
     , span [ class "chat-message" ] [ text message.displayMessage ]
     ]
+
+targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
+targetValue decoder tagger =
+  Json.Decode.map tagger
+    (Json.Decode.at ["target", "value" ] decoder)
+
+int : Json.Decode.Decoder Int
+int =
+  Json.Decode.string
+    |> Json.Decode.andThen (\text ->
+      case String.toInt text of
+        Ok n -> Json.Decode.succeed n
+        Err _ -> Json.Decode.fail "not an integer"
+      )
