@@ -12,8 +12,7 @@ import Http
 import Time exposing (Time)
 
 type Msg
-  = Update
-  | LogOut
+  = LogOut
 
 type alias Message =
   { authorDisplayName : String
@@ -33,7 +32,6 @@ view model =
           ] []
       else
         text ""
-    , button [ onClick Update ] [ text "Update" ]
     , model.messages
       |> List.map messageView
       |> ul []

@@ -229,10 +229,6 @@ update msg model =
     GotLiveChatMessages (Err err) ->
       let _ = Debug.log "fetch chat failed" err in
       ({model | messagePollingInterval = Nothing}, Cmd.none)
-    UI (View.Update) ->
-      ( model
-      , updateChatMessages model
-      )
     UI (View.LogOut) ->
       ( {model | auth = Nothing, refresh = Nothing}
       , case model.auth of
