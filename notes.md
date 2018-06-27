@@ -1,10 +1,9 @@
 - file:// pages always stay permission unknown
 - Incognito browsers always return denied
 
-- disable audio notice
-- configurable smallest update?
 - chat area with auto-scroll
-- actual style
+- toggle popup notifications
+- save settings
 - social links
 - readme
 

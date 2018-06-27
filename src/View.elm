@@ -5,7 +5,7 @@ import Notification exposing (NotificationStatus(..))
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, on)
+import Html.Events exposing (onClick, onCheck, on)
 import Navigation exposing (Location)
 import Uuid exposing (Uuid)
 import Http
@@ -15,6 +15,7 @@ import Json.Decode
 type Msg
   = LogOut
   | SetAudioNoticeIdle Int
+  | ToggleAudioNotice
 
 type alias Message =
   { authorDisplayName : String
@@ -50,18 +51,31 @@ view model =
     , header []
       [ loginView model
       , div [ class "stream-title" ] [text <| (model.title |> Maybe.withDefault "--")]
-    , div [ class "config-audio-notice-idle" ]
-      [ input
-        [ value <| toString model.audioNoticeIdle
-        , type_ "number"
-        , id "audio-notice-idle"
-        , name "audio-notice-idle"
-        , Html.Attributes.min "0"
-        , on "change" <| targetValue int SetAudioNoticeIdle
-        ] []
-      , text " "
-      , label [ for "audio-notice-idle" ] [ text "Chat Idle for Alarm" ]
-      ]
+      , div [ class "config-audio-notice" ]
+        [ span [ class "config-audio-notice-active" ]
+          [ input
+            [ type_ "checkbox"
+            , Html.Attributes.name "audio-notice-active"
+            , id "audio-notice-active"
+            , value "selected"
+            , onCheck (\_ -> ToggleAudioNotice)
+            , checked model.audioNoticeActive
+            ] []
+          ]
+        , span [ class "config-audio-notice-idle" ]
+          [ label [ for "audio-notice-idle" ] [ text "Audio alarm after idle for " ]
+          , text " "
+          , input
+            [ value <| toString model.audioNoticeIdle
+            , type_ "number"
+            , id "audio-notice-idle"
+            , name "audio-notice-idle"
+            , Html.Attributes.min "0"
+            , on "change" <| targetValue int SetAudioNoticeIdle
+            ] []
+          , label [ for "audio-notice-idle" ] [ text "s" ]
+          ]
+        ]
       , div [ class "notification-status" ] [text <| toString model.notificationStatus]
       ]
     , if model.audioNotice /= Nothing then

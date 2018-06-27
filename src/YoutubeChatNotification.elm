@@ -55,6 +55,7 @@ type alias Model =
   , messages : List Message
   , messagePageToken : Maybe String
   , messagePollingInterval : Maybe Time
+  , audioNoticeActive : Bool
   , audioNoticeIdle : Int
   , audioNotice : Maybe Time
   }
@@ -94,6 +95,7 @@ init location =
       , messages = []
       , messagePageToken = Nothing
       , messagePollingInterval = Nothing
+      , audioNoticeActive = True
       , audioNoticeIdle = defaultAudioNoticeIdle
       , audioNotice = Nothing
       }
@@ -239,6 +241,8 @@ update msg model =
       )
     UI (View.SetAudioNoticeIdle time) ->
       ( {model | audioNoticeIdle = time}, Cmd.none)
+    UI (View.ToggleAudioNotice) ->
+      ( {model | audioNoticeActive = not model.audioNoticeActive}, Cmd.none)
 
 resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
 resolveLoaded state model =
@@ -293,7 +297,7 @@ subscriptions model =
     , model.messagePollingInterval
       |> Maybe.map (\t -> Time.every t MessageUpdate)
       |> Maybe.withDefault Sub.none
-    , model.audioNotice
+    , (if model.audioNoticeActive then model.audioNotice else Nothing)
       |> Maybe.map (\_ -> Time.every audioNoticeLength AudioEnd)
       |> Maybe.withDefault Sub.none
     , model.authExpires
