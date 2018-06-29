@@ -46,6 +46,8 @@ header {
   position: absolute;
   top: 3em;
   bottom: 0;
+  display: flex;
+  flex-direction: column-reverse;
 }
 .chat-author {color: #56f; font-weight: bold;}
 """

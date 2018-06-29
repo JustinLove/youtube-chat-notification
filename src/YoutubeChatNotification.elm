@@ -212,10 +212,12 @@ update msg model =
       (model, Cmd.none)
     GotLiveChatMessages (Ok response) ->
       let
-        received = response.items |> List.map myMessage
+        received = response.items
+          |> List.map myMessage
+          |> List.reverse
         initialBatch = model.messagePageToken == Nothing
         messagesReceived = List.length received > 0
-        lastTime = List.head (List.reverse model.messages)
+        lastTime = List.head model.messages
           |> Maybe.map (.publishedAt)
           |> Maybe.withDefault 0 
         newTime = List.head received
@@ -227,7 +229,7 @@ update msg model =
           Cmd.none
       in
       ( { model
-        | messages = List.append model.messages received
+        | messages = List.append received model.messages
         , messagePageToken = response.nextPageToken
         , messagePollingInterval = Just <| max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }

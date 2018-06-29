@@ -1,7 +1,6 @@
 - file:// pages always stay permission unknown
 - Incognito browsers always return denied
 
-- new chat always in same place
 - toggle popup notifications
 - save settings
 - social links
