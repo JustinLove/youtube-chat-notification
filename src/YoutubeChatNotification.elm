@@ -201,7 +201,12 @@ update msg model =
           , title = mbroadcast |> Maybe.map .title
           }
       in
-      (m2, Navigation.newUrl <| createPath m2)
+      ( m2
+      , Cmd.batch
+        [ Navigation.newUrl <| createPath m2
+        , updateChatMessages m2
+        ]
+      )
     GotLiveBroadcasts (Err err) ->
       let _ = Debug.log "fetch broadcasts failed" err in
       (model, Cmd.none)

@@ -40,7 +40,7 @@ header {
 #chat-area {
   list-style-type: none;
   overflow: auto;
-  width: 100%;
+  width: 90%;
   margin: 0.5em;
   padding: 0;
   position: absolute;
