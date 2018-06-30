@@ -145,11 +145,11 @@ update msg model =
     TokenLifetimeStart expiresIn time ->
       ( {model | authExpires = Just (time+expiresIn), time = time}, Cmd.none)
     TokenExpired _ ->
-      ( {model | authExpires = Nothing}
-      , case model.refresh of
-        Just token -> refreshToken token
-        Nothing -> Debug.log "no refresh token" Cmd.none
-      )
+      case model.refresh of
+        Just token ->
+          ({model | authExpires = Nothing}, refreshToken token)
+        Nothing ->
+          ({model | auth = Nothing, authExpires = Nothing}, Cmd.none)
     AuthState uuid ->
       {model | requestState = Just uuid}
         |> persist
