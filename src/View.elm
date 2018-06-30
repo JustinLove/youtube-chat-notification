@@ -16,6 +16,7 @@ type Msg
   = LogOut
   | SetAudioNoticeIdle Int
   | ToggleAudioNotice
+  | TogglePopupNotification
 
 type alias Message =
   { authorDisplayName : String
@@ -58,32 +59,8 @@ view model =
     , header []
       [ loginView model
       , div [ class "stream-title" ] [text <| (model.title |> Maybe.withDefault "--")]
-      , div [ class "config-audio-notice" ]
-        [ span [ class "config-audio-notice-active" ]
-          [ input
-            [ type_ "checkbox"
-            , Html.Attributes.name "audio-notice-active"
-            , id "audio-notice-active"
-            , value "selected"
-            , onCheck (\_ -> ToggleAudioNotice)
-            , checked model.audioNoticeActive
-            ] []
-          ]
-        , span [ class "config-audio-notice-idle" ]
-          [ label [ for "audio-notice-idle" ] [ text "Audio alarm after idle for " ]
-          , text " "
-          , input
-            [ value <| toString model.audioNoticeIdle
-            , type_ "number"
-            , id "audio-notice-idle"
-            , name "audio-notice-idle"
-            , Html.Attributes.min "0"
-            , on "change" <| targetValue int SetAudioNoticeIdle
-            ] []
-          , label [ for "audio-notice-idle" ] [ text "s" ]
-          ]
-        ]
-      , div [ class "notification-status" ] [text <| toString model.notificationStatus]
+      , audioNoticeConfig model
+      , popupNotificationConfig model
       ]
     , if model.audioNotice /= Nothing then
         audio
@@ -136,6 +113,56 @@ urlForRedirect location =
 chop : String -> String -> String
 chop char s =
   if String.right 1 s == char then String.dropRight 1 s else s
+
+audioNoticeConfig model =
+  div [ class "config-audio-notice" ]
+  [ span [ class "config-audio-notice-active" ]
+    [ input
+      [ type_ "checkbox"
+      , Html.Attributes.name "audio-notice-active"
+      , id "audio-notice-active"
+      , value "selected"
+      , onCheck (\_ -> ToggleAudioNotice)
+      , checked model.audioNoticeActive
+      ] []
+    ]
+  , span [ class "config-audio-notice-idle" ]
+    [ label [ for "audio-notice-idle" ] [ text "Audio alarm after idle for " ]
+    , text " "
+    , input
+      [ value <| toString model.audioNoticeIdle
+      , type_ "number"
+      , id "audio-notice-idle"
+      , name "audio-notice-idle"
+      , Html.Attributes.min "0"
+      , on "change" <| targetValue int SetAudioNoticeIdle
+      ] []
+    , label [ for "audio-notice-idle" ] [ text "s" ]
+    ]
+  ]
+
+popupNotificationConfig model =
+  case model.notificationStatus of
+    Granted ->
+      div [ class "config-popup-notification" ]
+      [ span [ class "config-popup-notification-active" ]
+        [ input
+          [ type_ "checkbox"
+          , Html.Attributes.name "popup-notification-active"
+          , id "popup-notification-active"
+          , value "selected"
+          , onCheck (\_ -> TogglePopupNotification)
+          , checked model.popupNotificationActive
+          ] []
+        , label [ for "popup-notification-active" ] [ text "Popups" ]
+        ]
+      ]
+    Denied ->
+      div [ class "notification-status" ] [text "Denied" ]
+    Unknown ->
+      div [ class "notification-status" ] [text "Unknown" ]
+    Unsupported ->
+      div [ class "notification-status" ] [text "Unsupported" ]
 
 messageView : Message -> Html msg
 messageView message =

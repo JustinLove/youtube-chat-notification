@@ -57,6 +57,7 @@ type alias Model =
   , messages : List Message
   , messagePageToken : Maybe String
   , messagePollingInterval : Maybe Time
+  , popupNotificationActive : Bool
   , audioNoticeActive : Bool
   , audioNoticeIdle : Int
   , audioNotice : Maybe Time
@@ -97,6 +98,7 @@ init location =
       , messages = []
       , messagePageToken = Nothing
       , messagePollingInterval = Nothing
+      , popupNotificationActive = True
       , audioNoticeActive = True
       , audioNoticeIdle = defaultAudioNoticeIdle
       , audioNotice = Nothing
@@ -234,7 +236,7 @@ update msg model =
         , messagePollingInterval = Just <| max smallestPollingInterval (toFloat response.pollingIntervalMillis)
         }
       , Cmd.batch
-        [ if messagesReceived && not initialBatch then
+        [ if messagesReceived && not initialBatch && model.popupNotificationActive then
             List.map (\m -> Notification.send (m.authorDisplayName ++ ": " ++ m.displayMessage)) received
               |> (::) idleNotice
               |> Cmd.batch
@@ -257,6 +259,8 @@ update msg model =
       )
     UI (View.SetAudioNoticeIdle time) ->
       ( {model | audioNoticeIdle = time}, Cmd.none)
+    UI (View.TogglePopupNotification) ->
+      ( {model | popupNotificationActive = not model.popupNotificationActive}, Cmd.none)
     UI (View.ToggleAudioNotice) ->
       ( {model | audioNoticeActive = not model.audioNoticeActive}, Cmd.none)
 
