@@ -9,6 +9,9 @@ persist : Persist -> Value
 persist p =
   object
     [ ("authState", maybe Uuid.encode p.authState)
+    , ("popupNotificationActive", bool p.popupNotificationActive)
+    , ("audioNoticeActive", bool p.audioNoticeActive)
+    , ("audioNoticeIdle", int p.audioNoticeIdle)
     ]
 
 maybe : (a -> Value) -> Maybe a -> Value

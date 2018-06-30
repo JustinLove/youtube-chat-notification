@@ -7,5 +7,8 @@ import Json.Decode exposing (..)
 
 persist : Decoder Persist
 persist =
-  map Persist
+  map4 Persist
     (field "authState" (nullable Uuid.decoder))
+    (field "popupNotificationActive" bool)
+    (field "audioNoticeActive" bool)
+    (field "audioNoticeIdle" int)

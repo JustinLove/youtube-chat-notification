@@ -258,24 +258,33 @@ update msg model =
           Nothing -> Cmd.none
       )
     UI (View.SetAudioNoticeIdle time) ->
-      ( {model | audioNoticeIdle = time}, Cmd.none)
+      {model | audioNoticeIdle = time}
+        |> persist
     UI (View.TogglePopupNotification) ->
-      ( {model | popupNotificationActive = not model.popupNotificationActive}, Cmd.none)
+      {model | popupNotificationActive = not model.popupNotificationActive}
+        |> persist
     UI (View.ToggleAudioNotice) ->
-      ( {model | audioNoticeActive = not model.audioNoticeActive}, Cmd.none)
+      {model | audioNoticeActive = not model.audioNoticeActive}
+        |> persist
 
 resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
 resolveLoaded state model =
+  let m2 = { model
+    | popupNotificationActive = state.popupNotificationActive
+    , audioNoticeActive = state.audioNoticeActive
+    , audioNoticeIdle = state.audioNoticeIdle
+    }
+  in
   if YoutubeId.checkOauthState == False
      || model.responseState == state.authState then
-    ( model
-    , case model.auth of
+    ( m2
+    , case m2.auth of
       Just token -> validateToken token
       Nothing -> Cmd.none
     )
   else
     let _ = Debug.log "auth state mismatch" [model.responseState, state.authState] in
-    ( { model | auth = Nothing }
+    ( { m2 | auth = Nothing }
     , Cmd.none
     )
 
@@ -285,7 +294,11 @@ persist model =
 
 saveState : Model -> Cmd Msg
 saveState model =
-  Persist model.requestState
+  Persist
+      model.requestState
+      model.popupNotificationActive
+      model.audioNoticeActive
+      model.audioNoticeIdle
     |> Persist.Encode.persist
     |> LocalStorage.saveJson
 
