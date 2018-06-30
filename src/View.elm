@@ -6,6 +6,8 @@ import Notification exposing (NotificationStatus(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onCheck, on)
+import Svg exposing (svg, use)
+import Svg.Attributes exposing (xlinkHref)
 import Navigation exposing (Location)
 import Uuid exposing (Uuid)
 import Http
@@ -45,17 +47,34 @@ header {
   margin: 0.5em;
   padding: 0;
   position: absolute;
-  top: 3em;
-  bottom: 0;
+  top: 4em;
+  bottom: 1em;
   display: flex;
   flex-direction: column-reverse;
 }
 .chat-author {color: #56f; font-weight: bold;}
+.social {
+  background-color: #ddd;
+}
+.social a:hover, .social a:active { color: #222; }
+svg.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.2em;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
+}
+.icon-github { color: #242923; }
+.icon-twitter { color: #55acee; }
+.icon-youtube { color: #cc181e; }
 """
 
 view model =
   div []
     [ node "style" [] [ text css ]
+    , socialView
     , header []
       [ loginView model
       , div [ class "stream-title" ] [text <| (model.title |> Maybe.withDefault "--")]
@@ -171,6 +190,24 @@ messageView message =
     , text " "
     , span [ class "chat-message" ] [ text message.displayMessage ]
     ]
+
+socialView : Html msg
+socialView =
+  div [ class "social" ]
+    [ a [ href "https://github.com/JustinLove/youtube-chat-notification" ]
+      [ icon "github", text "youtube-chat-notification" ]
+    , text " "
+    , a [ href "https://twitter.com/wondible" ]
+      [ icon "twitter", text "@wondible" ]
+    , text " "
+    , a [ href "https://www.youtube.com/user/wondible" ]
+      [ icon "youtube", text "wondible" ]
+    ]
+
+icon : String -> Html msg
+icon name =
+  svg [ Svg.Attributes.class ("icon icon-"++name) ]
+    [ use [ xlinkHref ("#icon-"++name) ] [] ]
 
 targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
 targetValue decoder tagger =
