@@ -12,8 +12,8 @@ type NotificationStatus
   | Unknown
 
 mapStatus : String -> NotificationStatus
-mapStatus status =
-  case status of
+mapStatus name =
+  case name of
     "unsupported" -> Unsupported
     "denied" -> Denied
     "granted" -> Granted

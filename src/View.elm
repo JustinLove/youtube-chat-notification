@@ -1,18 +1,18 @@
-module View exposing (Msg(..), Message, view, urlForRedirect)
+module View exposing (Msg(..), Message, document, view, urlForRedirect)
 
 import YoutubeId
 import Notification exposing (NotificationStatus(..))
 
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onCheck, on)
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
-import Navigation exposing (Location)
 import Uuid exposing (Uuid)
-import Http
-import Time exposing (Time)
+import Time exposing (Posix)
 import Json.Decode
+import Url exposing (Url)
 
 type Msg
   = LogOut
@@ -22,7 +22,7 @@ type Msg
 
 type alias Message =
   { authorDisplayName : String
-  , publishedAt : Time
+  , publishedAt : Posix
   , displayMessage : String
   }
 
@@ -71,6 +71,11 @@ svg.icon {
 .icon-youtube { color: #cc181e; }
 """
 
+document tagger model =
+  { title = "Youtube Chat Notification"
+  , body = [Html.map tagger (view model)]
+  }
+
 view model =
   div []
     [ node "style" [] [ text css ]
@@ -101,9 +106,9 @@ loginView model =
         [ text " "
         , button [ onClick LogOut ] [ text "Log out" ]
         , text " expires: "
-        , text <| toString <| round
+        , text <| String.fromInt
           (model.authExpires
-            |> Maybe.map (\t -> (t - model.time) / Time.second)
+            |> Maybe.map (\t -> (t - (Time.posixToMillis model.time)) // 1000) 
             |> Maybe.withDefault 0
           )
         ]
@@ -114,20 +119,16 @@ authorizeUrl : String -> Maybe Uuid -> String
 authorizeUrl redirectUri authState =
   "https://accounts.google.com/o/oauth2/auth"
     ++ "?client_id=" ++ YoutubeId.clientId
-    ++ "&redirect_uri=" ++ (Http.encodeUri redirectUri)
+    ++ "&redirect_uri=" ++ (Url.percentEncode redirectUri)
     ++ "&response_type=token"
-    ++ "&scope=" ++ (Http.encodeUri "https://www.googleapis.com/auth/youtube.readonly")
+    ++ "&scope=" ++ (Url.percentEncode "https://www.googleapis.com/auth/youtube.readonly")
     ++ (case authState of
       Just uuid -> "&state=" ++ (Uuid.toString uuid)
       Nothing -> "")
 
-urlForRedirect : Location -> String
-urlForRedirect location =
-  location.href
-    |> String.dropRight (String.length location.hash)
-    |> String.dropRight (String.length location.search)
-    |> chop "#"
-    |> chop "?"
+urlForRedirect : Url -> String
+urlForRedirect url =
+  {url | query = Nothing, fragment = Nothing } |> Url.toString
 
 chop : String -> String -> String
 chop char s =
@@ -149,7 +150,7 @@ audioNoticeConfig model =
     [ label [ for "audio-notice-idle" ] [ text "Audio alarm after idle for " ]
     , text " "
     , input
-      [ value <| toString model.audioNoticeIdle
+      [ value <| String.fromInt model.audioNoticeIdle
       , type_ "number"
       , id "audio-notice-idle"
       , name "audio-notice-idle"
@@ -207,7 +208,7 @@ socialView =
 icon : String -> Html msg
 icon name =
   svg [ Svg.Attributes.class ("icon icon-"++name) ]
-    [ use [ xlinkHref ("#icon-"++name) ] [] ]
+    [ use [ xlinkHref ("symbol-defs.svg#icon-"++name) ] [] ]
 
 targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
 targetValue decoder tagger =
@@ -219,6 +220,6 @@ int =
   Json.Decode.string
     |> Json.Decode.andThen (\text ->
       case String.toInt text of
-        Ok n -> Json.Decode.succeed n
-        Err _ -> Json.Decode.fail "not an integer"
+        Just n -> Json.Decode.succeed n
+        Nothing -> Json.Decode.fail "not an integer"
       )

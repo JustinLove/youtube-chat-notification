@@ -10,30 +10,33 @@ import Persist exposing (Persist)
 import Persist.Encode
 import Persist.Decode
 
+import Browser
+import Browser.Dom as Dom
+import Browser.Navigation as Navigation
 import Html
-import Navigation exposing (Location)
 import Uuid exposing (Uuid)
-import Random.Pcg as Random
+import Random
 import Http
 import Json.Decode
-import Time exposing (Time)
+import Time exposing (Posix)
 import Task
-import Dom.Scroll
+import Url exposing (Url)
 
-smallestPollingInterval = 10 * Time.second
-audioNoticeLength = 3 * Time.second
+smallestPollingInterval = 10 * 1000
+audioNoticeLength = 3 * 1000
 defaultAudioNoticeIdle = 2 * 60
 
 type Msg
   = Noop
   | Loaded (Maybe Persist)
   | GotNotificationStatus NotificationStatus
-  | CurrentUrl Location
-  | AudioStart Time
-  | AudioEnd Time
-  | MessageUpdate Time
-  | TokenLifetimeStart Time Time
-  | TokenExpired Time
+  | CurrentUrl Url
+  | Navigate Browser.UrlRequest
+  | AudioStart Posix
+  | AudioEnd Posix
+  | MessageUpdate Posix
+  | TokenLifetimeStart Int Posix
+  | TokenExpired Posix
   | AuthState Uuid
   | AccessToken (Result Http.Error (GoogleApis.AccessToken))
   | RefreshToken (Result Http.Error (GoogleApis.AccessToken))
@@ -45,34 +48,37 @@ type Msg
 
 type alias Model =
   { notificationStatus : NotificationStatus
-  , location : Location
-  , time : Time
+  , location : Url
+  , navigationKey : Navigation.Key
+  , time : Posix
   , responseState : Maybe Uuid
   , requestState : Maybe Uuid
   , auth : Maybe String
-  , authExpires : Maybe Time
+  , authExpires : Maybe Int
   , refresh : Maybe String
   , title : Maybe String
   , liveChatId : Maybe String
   , messages : List Message
   , messagePageToken : Maybe String
-  , messagePollingInterval : Maybe Time
+  , messagePollingInterval : Maybe Float
   , popupNotificationActive : Bool
   , audioNoticeActive : Bool
   , audioNoticeIdle : Int
-  , audioNotice : Maybe Time
+  , audioNotice : Maybe Posix
   }
 
 main =
-  Navigation.program CurrentUrl
+  Browser.application
     { init = init
-    , view = (\model -> Html.map UI (View.view model))
+    , view = View.document UI
     , update = update
     , subscriptions = subscriptions
+    , onUrlRequest = Navigate
+    , onUrlChange = CurrentUrl
     }
 
-init : Location -> (Model, Cmd Msg)
-init location =
+init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
+init flags location key =
   let
     auth = extractHashArgument "access_token" location
     code = extractSearchArgument "code" location
@@ -83,11 +89,12 @@ init location =
         |> Maybe.andThen Uuid.fromString
     liveChatId = extractSearchArgument "liveChatId" location
     title = extractSearchArgument "title" location
-      |> Maybe.andThen Http.decodeUri
+      |> Maybe.andThen Url.percentDecode
     model =
       { notificationStatus = Unknown
       , location = location
-      , time = 0
+      , navigationKey = key
+      , time = Time.millisToPosix 0
       , responseState = state
       , requestState = Nothing
       , auth = auth
@@ -136,6 +143,12 @@ update msg model =
       )
     CurrentUrl location ->
       ({model | location = location}, Cmd.none)
+    Navigate (Browser.Internal url) ->
+      ( {model | location = url}
+      , Navigation.pushUrl model.navigationKey (Url.toString url)
+      )
+    Navigate (Browser.External url) ->
+      (model, Navigation.load url)
     AudioStart time ->
       ({model | audioNotice = Just time}, Cmd.none)
     AudioEnd _ ->
@@ -143,7 +156,7 @@ update msg model =
     MessageUpdate time ->
       ({model | time = time}, updateChatMessages model)
     TokenLifetimeStart expiresIn time ->
-      ( {model | authExpires = Just (time+expiresIn), time = time}, Cmd.none)
+      ( {model | authExpires = Just ((Time.posixToMillis time)+expiresIn), time = time}, Cmd.none)
     TokenExpired _ ->
       case model.refresh of
         Just token ->
@@ -161,7 +174,7 @@ update msg model =
       ( {model | auth = Just info.access_token, refresh = info.refresh_token}
       , Cmd.batch
         [ fetchLiveBroadcasts (Just info.access_token)
-        , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+        , Time.now |> Task.perform (TokenLifetimeStart (info.expires_in * 1000))
         ]
       )
     AccessToken (Err err) ->
@@ -170,7 +183,7 @@ update msg model =
     RefreshToken (Ok info) ->
       let _ = Debug.log "token expires in " info.expires_in in
       ( {model | auth = Just info.access_token}
-      , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+      , Time.now |> Task.perform (TokenLifetimeStart (info.expires_in * 1000))
       )
     RefreshToken (Err err) ->
       let _ = Debug.log "refresh token failed" err in
@@ -188,7 +201,7 @@ update msg model =
       ( {model | auth = Just token}
       , Cmd.batch
         [ fetchLiveBroadcasts (Just token)
-        , Time.now |> Task.perform (TokenLifetimeStart ((toFloat info.expires_in) * Time.second))
+        , Time.now |> Task.perform (TokenLifetimeStart (info.expires_in * 1000))
         ]
       )
     TokenInfo _ (Err err) ->
@@ -205,7 +218,7 @@ update msg model =
       in
       ( m2
       , Cmd.batch
-        [ Navigation.newUrl <| createPath m2
+        [ Navigation.pushUrl m2.navigationKey <| createPath m2
         , updateChatMessages m2
         ]
       )
@@ -220,15 +233,15 @@ update msg model =
         initialBatch = model.messagePageToken == Nothing
         messagesReceived = List.length received > 0
         lastTime = List.head model.messages
-          |> Maybe.map (.publishedAt)
-          |> Maybe.withDefault 0 
+          |> Maybe.map (.publishedAt >> Time.posixToMillis)
+          |> Maybe.withDefault 0
         newTime = List.head received
-          |> Maybe.map (.publishedAt)
+          |> Maybe.map (.publishedAt >> Time.posixToMillis)
           |> Maybe.withDefault lastTime
-        idleNotice = if newTime - lastTime > ((toFloat model.audioNoticeIdle) * Time.second) then
-          (Time.now |> Task.perform AudioStart)
-        else
-          Cmd.none
+        idleNotice = if newTime - lastTime > (model.audioNoticeIdle * 1000) then
+            (Time.now |> Task.perform AudioStart)
+          else
+            Cmd.none
       in
       ( { model
         | messages = List.append received model.messages
@@ -243,7 +256,9 @@ update msg model =
           else
             Cmd.none
         , if messagesReceived then
-            Task.attempt (always Noop) <| Dom.Scroll.toBottom "chat-area"
+            Dom.getViewportOf "chat-area"
+              |> Task.andThen (\viewport -> Dom.setViewportOf "chat-area" 0 viewport.scene.height)
+              |> Task.attempt (always Noop)
           else
             Cmd.none
         ]
@@ -269,11 +284,12 @@ update msg model =
 
 resolveLoaded : Persist -> Model -> (Model, Cmd Msg)
 resolveLoaded state model =
-  let m2 = { model
-    | popupNotificationActive = state.popupNotificationActive
-    , audioNoticeActive = state.audioNoticeActive
-    , audioNoticeIdle = state.audioNoticeIdle
-    }
+  let
+    m2 = { model
+      | popupNotificationActive = state.popupNotificationActive
+      , audioNoticeActive = state.audioNoticeActive
+      , audioNoticeIdle = state.audioNoticeIdle
+      }
   in
   if YoutubeId.checkOauthState == False
      || model.responseState == state.authState then
@@ -334,18 +350,18 @@ subscriptions model =
       |> Maybe.map (\_ -> Time.every audioNoticeLength AudioEnd)
       |> Maybe.withDefault Sub.none
     , model.authExpires
-      |> Maybe.map (\t -> Time.every (t - model.time) TokenExpired)
+      |> Maybe.map (\t -> Time.every (toFloat (t - (Time.posixToMillis model.time))) TokenExpired)
       |> Maybe.withDefault Sub.none
     ]
 
-exchangeTokenBody : Location -> String -> Http.Body
+exchangeTokenBody : Url -> String -> Http.Body
 exchangeTokenBody location code =
   Http.stringBody "application/x-www-form-urlencoded" <|
     ("code=" ++ code ++
-    "&redirect_uri=" ++ (Http.encodeUri (urlForRedirect location)) ++
+    "&redirect_uri=" ++ (Url.percentEncode (urlForRedirect location)) ++
     "&grant_type=authorization_code")
 
-exchangeToken : Location -> String -> Cmd Msg
+exchangeToken : Url -> String -> Cmd Msg
 exchangeToken location code =
   Http.send AccessToken <| Http.request
     { method = "POST"
@@ -462,33 +478,35 @@ authHeaders auth =
     Nothing ->
       []
 
-extractHashArgument : String -> Location -> Maybe String
+extractHashArgument : String -> Url -> Maybe String
 extractHashArgument key location =
-  location.hash
-    |> String.dropLeft 1
-    |> String.split "&"
-    |> List.map (String.split "=")
-    |> List.filter (\x -> case List.head x of
-      Just s ->
-        s == key
-      Nothing ->
-        False)
-    |> List.head
+  location.fragment
+    |> Maybe.andThen (\m -> m
+      |> String.split "&"
+      |> List.map (String.split "=")
+      |> List.filter (\x -> case List.head x of
+        Just s ->
+          s == key
+        Nothing ->
+          False)
+      |> List.head
+      )
     |> Maybe.andThen List.tail
     |> Maybe.andThen List.head
 
-extractSearchArgument : String -> Location -> Maybe String
+extractSearchArgument : String -> Url -> Maybe String
 extractSearchArgument key location =
-  location.search
-    |> String.dropLeft 1
-    |> String.split "&"
-    |> List.map (String.split "=")
-    |> List.filter (\x -> case List.head x of
-      Just s ->
-        s == key
-      Nothing ->
-        False)
-    |> List.head
+  location.query
+    |> Maybe.andThen (\m -> m
+      |> String.split "&"
+      |> List.map (String.split "=")
+      |> List.filter (\x -> case List.head x of
+        Just s ->
+          s == key
+        Nothing ->
+          False)
+      |> List.head
+      )
     |> Maybe.andThen List.tail
     |> Maybe.andThen List.head
 
@@ -505,5 +523,5 @@ createQueryString model =
     |> String.join "&"
 
 createPath : Model -> String
-createPath model =
-  model.location.pathname ++ "?" ++ (createQueryString model)
+createPath ({location} as model) =
+  { location | query = Just (createQueryString model), fragment = Nothing } |> Url.toString

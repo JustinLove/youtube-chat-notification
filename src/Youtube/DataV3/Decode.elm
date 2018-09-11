@@ -11,8 +11,7 @@ module Youtube.DataV3.Decode exposing
   )
 
 import Json.Decode exposing (..)
-import Time exposing (Time)
-import Date
+import Time exposing (Posix)
 import Dict exposing (Dict)
 
 type alias LiveBroadcastListResponse =
@@ -52,15 +51,15 @@ liveBroadcast =
     --(field "statistics" maybe statistics)
 
 type alias LiveBroadcastSnippet =
-  { publishedAt : Time
+  { publishedAt : Posix
   , channelId : String
   , title : String
   , description : String
   , thumbnails : Dict String Thumbnail
-  , scheduledStartTime : Time
-  , scheduledEndTime : Maybe Time
-  , actualStartTime : Maybe Time
-  , actualEndTime : Maybe Time
+  , scheduledStartTime : Posix
+  , scheduledEndTime : Maybe Posix
+  , actualStartTime : Maybe Posix
+  , actualEndTime : Maybe Posix
   , isDefaultBroadcast : Bool
   , liveChatId : String
   }
@@ -152,7 +151,7 @@ type alias LiveChatMessageListResponse =
   { etag : String
   , nextPageToken : Maybe String
   , pollingIntervalMillis : Int
-  , offlineAt : Maybe Time
+  , offlineAt : Maybe Posix
   , pageInfo : PageInfo
   , items : List LiveChatMessage
   }
@@ -184,7 +183,7 @@ liveChatMessage =
 
 type LiveChatMessageSnippet
   = TextMessageEvent TextMessageEventDetails
-  | UnknownEvent String Time
+  | UnknownEvent String Posix
 
 liveChatMessageSnippet : Decoder LiveChatMessageSnippet
 liveChatMessageSnippet =
@@ -200,7 +199,7 @@ liveChatMessageSnippet =
       )
 
 type alias TextMessageEventDetails =
-  { publishedAt : Time
+  { publishedAt : Posix
   , authorChannelId : String
   , messageText : String
   }
@@ -287,10 +286,13 @@ pageInfo =
     (field "totalResults" int)
     (field "resultsPerPage" int)
 
-timeStamp : Decoder Time
+timeStamp : Decoder Posix
 timeStamp =
+  succeed (Time.millisToPosix 0)
+  {-
   string
     |> andThen (\s -> case Date.fromString s of
       Ok d -> succeed (Date.toTime d)
       Err err -> fail err
     )
+    -}
