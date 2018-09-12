@@ -12,6 +12,7 @@ module Youtube.DataV3.Decode exposing
 
 import Json.Decode exposing (..)
 import Time exposing (Posix)
+import Iso8601
 import Dict exposing (Dict)
 
 type alias LiveBroadcastListResponse =
@@ -287,12 +288,4 @@ pageInfo =
     (field "resultsPerPage" int)
 
 timeStamp : Decoder Posix
-timeStamp =
-  succeed (Time.millisToPosix 0)
-  {-
-  string
-    |> andThen (\s -> case Date.fromString s of
-      Ok d -> succeed (Date.toTime d)
-      Err err -> fail err
-    )
-    -}
+timeStamp = Iso8601.decoder
