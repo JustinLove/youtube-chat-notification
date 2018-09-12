@@ -21,6 +21,8 @@ import Json.Decode
 import Time exposing (Posix)
 import Task
 import Url exposing (Url)
+import Url.Parser
+import Url.Parser.Query
 
 smallestPollingInterval = 10 * 1000
 audioNoticeLength = 3 * 1000
@@ -480,35 +482,15 @@ authHeaders auth =
 
 extractHashArgument : String -> Url -> Maybe String
 extractHashArgument key location =
-  location.fragment
-    |> Maybe.andThen (\m -> m
-      |> String.split "&"
-      |> List.map (String.split "=")
-      |> List.filter (\x -> case List.head x of
-        Just s ->
-          s == key
-        Nothing ->
-          False)
-      |> List.head
-      )
-    |> Maybe.andThen List.tail
-    |> Maybe.andThen List.head
+  { location | path = "", query = location.fragment }
+    |> Url.Parser.parse (Url.Parser.query (Url.Parser.Query.string key))
+    |> Maybe.withDefault Nothing
 
 extractSearchArgument : String -> Url -> Maybe String
 extractSearchArgument key location =
-  location.query
-    |> Maybe.andThen (\m -> m
-      |> String.split "&"
-      |> List.map (String.split "=")
-      |> List.filter (\x -> case List.head x of
-        Just s ->
-          s == key
-        Nothing ->
-          False)
-      |> List.head
-      )
-    |> Maybe.andThen List.tail
-    |> Maybe.andThen List.head
+  { location | path = "" }
+    |> Url.Parser.parse (Url.Parser.query (Url.Parser.Query.string key))
+    |> Maybe.withDefault Nothing
 
 createQueryString : Model -> String
 createQueryString model =
