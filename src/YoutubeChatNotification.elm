@@ -23,6 +23,7 @@ import Task
 import Url exposing (Url)
 import Url.Parser
 import Url.Parser.Query
+import Url.Builder as Url
 
 smallestPollingInterval = 10 * 1000
 audioNoticeLength = 3 * 1000
@@ -494,15 +495,12 @@ extractSearchArgument key location =
 
 createQueryString : Model -> String
 createQueryString model =
-  [ case model.title of
-      Just title -> "title=" ++ title
-      Nothing -> ""
-  , case model.liveChatId of
-      Just id -> "liveChatId=" ++ id
-      Nothing -> ""
+  [ model.title |> Maybe.map (Url.string "title")
+  , model.liveChatId |> Maybe.map (Url.string "liveChatId")
   ]
-    |> List.filter ((/=) "")
-    |> String.join "&"
+    |> List.filterMap identity
+    |> Url.toQuery
+    |> String.dropLeft 1
 
 createPath : Model -> String
 createPath ({location} as model) =
