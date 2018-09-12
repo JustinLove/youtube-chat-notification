@@ -1,6 +1,3 @@
-- posix times are a pain to work with, do we really need them?
-
-- Not noticing messages after token timeout?
 - Incognito browsers always return denied
 
 - revist proxy code

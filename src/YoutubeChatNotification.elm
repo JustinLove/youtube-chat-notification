@@ -9,6 +9,7 @@ import LocalStorage
 import Persist exposing (Persist)
 import Persist.Encode
 import Persist.Decode
+import TimeDiff
 
 import Browser
 import Browser.Dom as Dom
@@ -57,7 +58,7 @@ type alias Model =
   , responseState : Maybe Uuid
   , requestState : Maybe Uuid
   , auth : Maybe String
-  , authExpires : Maybe Int
+  , authExpires : Maybe Posix
   , refresh : Maybe String
   , title : Maybe String
   , liveChatId : Maybe String
@@ -159,7 +160,7 @@ update msg model =
     MessageUpdate time ->
       ({model | time = time}, updateChatMessages model)
     TokenLifetimeStart expiresIn time ->
-      ( {model | authExpires = Just ((Time.posixToMillis time)+expiresIn), time = time}, Cmd.none)
+      ( {model | authExpires = Just (time |> TimeDiff.plus expiresIn), time = time}, Cmd.none)
     TokenExpired _ ->
       case model.refresh of
         Just token ->
@@ -353,7 +354,7 @@ subscriptions model =
       |> Maybe.map (\_ -> Time.every audioNoticeLength AudioEnd)
       |> Maybe.withDefault Sub.none
     , model.authExpires
-      |> Maybe.map (\t -> Time.every (toFloat (t - (Time.posixToMillis model.time))) TokenExpired)
+      |> Maybe.map (\t -> Time.every (toFloat (TimeDiff.delta t model.time)) TokenExpired)
       |> Maybe.withDefault Sub.none
     ]
 

@@ -2,6 +2,7 @@ module View exposing (Msg(..), Message, document, view, urlForRedirect)
 
 import YoutubeId
 import Notification exposing (NotificationStatus(..))
+import TimeDiff
 
 import Browser
 import Html exposing (..)
@@ -109,7 +110,7 @@ loginView model =
         , text " expires: "
         , text <| String.fromInt
           (model.authExpires
-            |> Maybe.map (\t -> (t - (Time.posixToMillis model.time)) // 1000) 
+            |> Maybe.map (\t -> (TimeDiff.delta t model.time) // 1000) 
             |> Maybe.withDefault 0
           )
         ]
