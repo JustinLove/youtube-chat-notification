@@ -13,6 +13,7 @@ import Uuid exposing (Uuid)
 import Time exposing (Posix)
 import Json.Decode
 import Url exposing (Url)
+import Url.Builder as Url
 
 type Msg
   = LogOut
@@ -118,13 +119,18 @@ loginView model =
 authorizeUrl : String -> Maybe Uuid -> String
 authorizeUrl redirectUri authState =
   "https://accounts.google.com/o/oauth2/auth"
-    ++ "?client_id=" ++ YoutubeId.clientId
-    ++ "&redirect_uri=" ++ (Url.percentEncode redirectUri)
-    ++ "&response_type=token"
-    ++ "&scope=" ++ (Url.percentEncode "https://www.googleapis.com/auth/youtube.readonly")
-    ++ (case authState of
-      Just uuid -> "&state=" ++ (Uuid.toString uuid)
-      Nothing -> "")
+    ++ (
+      List.append
+        [ Url.string "client_id" YoutubeId.clientId
+        , Url.string "redirect_uri" redirectUri
+        , Url.string "response_type" "token"
+        , Url.string "scope" "https://www.googleapis.com/auth/youtube.readonly"
+        ]
+        (case authState of
+          Just uuid -> [ Url.string "state" (Uuid.toString uuid) ]
+          Nothing -> [])
+      |> Url.toQuery
+      )
 
 urlForRedirect : Url -> String
 urlForRedirect url =

@@ -1,4 +1,3 @@
-- percent encoding, url module now has to a depenency anyway
 - url argument parsing, since we have url module anyway
 - posix times are a pain to work with, do we really need them?
 
